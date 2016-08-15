@@ -104,10 +104,10 @@ while ter_crit == 0:
     ModelInfo_obj.X = surrogate.X
     ModelInfo_obj.ynorm = surrogate.Y
     ModelInfo_obj.thetas = surrogate.thetas
-    ModelInfo_obj.R_inv = surrogate.R_inv
     ModelInfo_obj.mu = np.mean(surrogate.Y) #This value should always be 0.0
     ModelInfo_obj.SigmaSqr = surrogate.sigma2/np.square(surrogate.Y_std) #This value should always be 1.0
     ModelInfo_obj.c_r = surrogate.alpha
+    ModelInfo_obj.R_inv = surrogate.Vh.T.dot(np.einsum('i,ij->ij', surrogate.S_inv, surrogate.U.T))
     ModelInfo_obj.Y_mean = surrogate.Y_mean
     ModelInfo_obj.Y_std = surrogate.Y_std
     ModelInfo_obj.X_std = surrogate.X_std.reshape(num_xI,1)
