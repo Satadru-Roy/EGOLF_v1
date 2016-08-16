@@ -17,7 +17,8 @@ from solver_MINLP import MINLP_BB
 from random import uniform
 import time
 
-num_des = 4; prob = 2
+num_des = 2 #Total number of design variables
+prob = 2 # Problem type: 1. Branin 2. Griewank
 ################################################################################
 #Step 0: Initialize
 iter = 1
@@ -43,14 +44,14 @@ if M>0:
 # Step 1: Generate a set of initial integer points
 # Use Latin Hypercube Sampling to generate the initial points
 # User supplied (in future use LHS). Provide num_xI+2 starting points
-# x0I_01 = np.array([[0.0],[.76],[1.0]]) #2-D Problem with 1 int var.
+x0I_01 = np.array([[0.0],[.76],[1.0]]) #2-D Problem with 1 int var.
 # x0I_01 = np.array([[0.0, 0.0],[0.31, 0.79],[0.61, 0.61],[1.0, 1.0]]) #4-D problem with 2 int var.
 
 # Randomly generated initial integer points (Use LHS in the future release)
-x0I_01 = np.zeros([n,num_xI])
-for ii in xrange(n):
-    for jj in xrange(num_xI):
-        x0I_01[ii,jj] = uniform(0,1)
+# x0I_01 = np.zeros([n,num_xI])
+# for ii in xrange(n):
+#     for jj in xrange(num_xI):
+#         x0I_01[ii,jj] = uniform(0,1)
 
 #####################################################
 #Complete enumeration for verification
