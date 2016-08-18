@@ -42,6 +42,12 @@ class cont_opt(Component):
             for ii in xrange(len(xI)):
                 f2I *= np.cos(xI[ii]/np.sqrt(ii+1.))
             unknowns['f'] = ((f1C+f1I)-(f2C*f2I) + 1.)[0]
+        elif self.prob == 3:  #Rosenbrock's function
+            x = np.array([params['xI'],params['xC']])
+            f = 0.0
+            for ii in xrange(self.num_des-1):
+                f += 100*(x[ii+1] - x[ii]**2)**2 + (x[ii] - 1)**2
+            unknowns['f'] = f
 
     def linearize(self, params, unknowns, resids):
         """ Provide the Jacobian"""
@@ -53,10 +59,6 @@ class cont_opt(Component):
             a = 1.; b = 5.1/(4.*np.pi**2); c = 5.0/np.pi; d = 6.; e = 10.0; f = 1./(8.*np.pi)
             J['f', 'xC'] = 2.0*a*(x[1] - b*x[0]**2 + c*x[0] - d)
             # J['f', 'xI'] = 2.0*a*(x[1] - b*x[0]**2 + c*x[0] - d)*(-2.*b*x[0] + c) - e*(1.-f)*np.sin(x[0])
-        elif self.prob == 2:
-            xI = params['xI']
-            xC = params['xC']
-            # J['f','xC'] =
         return J
 
 def continuous_optimization_test(x0I, M, num_des, prob):
@@ -65,7 +67,7 @@ def continuous_optimization_test(x0I, M, num_des, prob):
     num_xI = x0I.shape[1]
     [xC_lb, xC_ub] = initialize_cont_test(num_des, prob)
     num_xC = len(xC_lb)
-    xC0 = (xC_lb + 0.5*(xC_ub-xC_lb)).reshape(1,num_xC)
+    xC0 = (xC_lb + 0.0*(xC_ub-xC_lb)).reshape(1,num_xC)
     xC_opt = np.zeros([n,num_xC])
     obj = np.zeros([n,1])
     funCount = np.ones([n,1])
@@ -85,7 +87,7 @@ def continuous_optimization_test(x0I, M, num_des, prob):
         top.driver = ScipyOptimizer()
         top.driver.options['optimizer'] = 'SLSQP'
 
-        top.driver.add_desvar('Inp2.xC', lower=0.0, upper=15.0)
+        top.driver.add_desvar('Inp2.xC', lower=xC_lb, upper=xC_ub)
         top.driver.add_objective('copt.f')
 
         top.root.deriv_options['type'] = 'fd'

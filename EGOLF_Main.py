@@ -18,7 +18,7 @@ from random import uniform
 import time
 
 num_des = 2 #Total number of design variables
-prob = 2 # Problem type: 1. Branin 2. Griewank
+prob = 3 # Problem type: 1. Branin 2. Griewank 3. Rosenbrock
 ################################################################################
 #Step 0: Initialize
 iter = 1

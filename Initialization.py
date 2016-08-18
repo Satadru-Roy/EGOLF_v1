@@ -13,6 +13,10 @@ def initialize_test(num_des, prob):
         # Griewank Function
         xI_lb = -5.0*np.ones([num_des/2,1]); xI_ub = 5.0*np.ones([num_des/2,1])
         M = 0
+    elif prob == 3:
+        # Rosenbrock function
+        xI_lb = -5.0*np.ones([num_des/2,1]); xI_ub = 10.0*np.ones([num_des/2,1])
+        M = 0
     return xI_lb, xI_ub, M
 
 def initialize_cont_test(num_des, prob):
@@ -23,7 +27,9 @@ def initialize_cont_test(num_des, prob):
     elif prob == 2:
         # Griewank Function
         xC_lb = -5.0*np.ones([num_des/2,1]); xC_ub = 5.0*np.ones([num_des/2,1])
-        M = 0
+    elif prob == 3:
+        # Rosenbrock function
+        xC_lb = -5.0*np.ones([num_des/2,1]); xC_ub = 10.0*np.ones([num_des/2,1])
     return xC_lb, xC_ub
 
 class ModelInfo:
