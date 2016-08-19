@@ -67,7 +67,7 @@ def continuous_optimization_test(x0I, M, num_des, prob):
     num_xI = x0I.shape[1]
     [xC_lb, xC_ub] = initialize_cont_test(num_des, prob)
     num_xC = len(xC_lb)
-    xC0 = (xC_lb + 0.0*(xC_ub-xC_lb)).reshape(1,num_xC)
+    xC0 = (xC_lb + 0.5*(xC_ub-xC_lb)).reshape(1,num_xC)
     xC_opt = np.zeros([n,num_xC])
     obj = np.zeros([n,1])
     funCount = np.ones([n,1])

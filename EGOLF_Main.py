@@ -26,7 +26,7 @@ ter_crit = 0;Tot_pt_prev = 0;y_opt = 0.0;num_pt = 0;fea_pt = 0;Tot_newpt_added =
 Tot_FunCount = 0;ec2 = 0;ei_max = 0.0
 ei_tol_per = 0.001
 ei_tol_abs = 0.001
-new_sol = [];comp = [];FEA_obj = [];FEA_xopt = [];ModelInfo_obj=[];ModelInfo_g=[]
+new_sol = [];comp = [];FEA_obj = [];FEA_xopt = []; ModelInfo_obj=[];ModelInfo_g=[]
 y_opt = np.inf
 
 [xI_lb,xI_ub,M] = initialize_test(num_des, prob)
