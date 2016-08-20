@@ -179,8 +179,18 @@ def MINLP_BB(xI_lb, xI_ub, ModelInfo_obj, ModelInfo_g):
                         if M>0:
                             # Expected violation goes here
                             for mm in xrange(M):
-                                # Constraints goes here
-                                print "Eval con"
+                                x_comL, x_comU, Ain_hat, bin_hat = gen_coeff_bound(lb,ub,ModelInfo_obj)
+                                sU_g, eflag_sU_g = maximize_S(x_comL, x_comU, Ain_hat, bin_hat, ModelInfo_g[mm])
+                                sL_g = -1.*sU_g
+                                if eflag_sU_g >= 1:
+                                    yL_g, eflag_yL_g = minimize_y(x_comL, x_comU, Ain_hat, bin_hat, ModelInfo_g[mm])
+                                    if eflag_yL_g >= 1:
+                                        EV[mm] = calc_conEV_norm([],ModelInfo_g[mm],sL_g,yL_g)
+                                    else:
+                                        S4_fail = 1.
+                                        break
+                                else:
+                                    S4_fail = 1
                     else:
                         # print "Cannot solve Min y_hat problem!"
                         S4_fail = 1
@@ -263,9 +273,8 @@ def combined_obj(xI,*param):
     M=len(ModelInfo_g)
     EV = np.zeros([M,1])
     if M>0:
-        # Expected violation evaluation goes here
         for mm in xrange(M):
-            print "Eval con"
+            EV[mm] = calc_conEV_norm(xval,ModelInfo_g[mm])
 
     conNegEI = NegEI/(1.0+np.sum(EV))
     P=0.0
@@ -320,7 +329,7 @@ def calc_conEV_norm(xval,ModelInfo_g,*param):
         c_r = ModelInfo_g.c_r
         thetas = ModelInfo_g.thetas
         SigmaSqr = ModelInfo_g.SigmaSqr
-        R_inv = ModelInfo_obj.R_inv
+        R_inv = ModelInfo_g.R_inv
         mu = ModelInfo_g.mu
         p = ModelInfo_g.p
         n = np.shape(X)[0]
@@ -340,7 +349,7 @@ def calc_conEV_norm(xval,ModelInfo_g,*param):
         EV = 0.0
     else:
         # Calculate expected violation
-        ei1 = (g_hat-g_min)*(0.5+0.5*erf((1/np.sqrt(2.0))*((g_hat-g_min)/sqrt(abs(gSSqr)))))
+        ei1 = (g_hat-g_min)*(0.5+0.5*erf((1.0/np.sqrt(2.0))*((g_hat-g_min)/np.sqrt(abs(gSSqr)))))
         ei2 = np.sqrt(np.abs(gSSqr))*(1.0/np.sqrt(2.0*np.pi))*np.exp(-0.5*((g_hat-g_min)**2/np.abs(gSSqr)))
         EV = (ei1 + ei2)
 
