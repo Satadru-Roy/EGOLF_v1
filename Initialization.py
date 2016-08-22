@@ -17,6 +17,10 @@ def initialize_test(num_des, prob):
         # Rosenbrock function
         xI_lb = -5.0*np.ones([num_des/2,1]); xI_ub = 10.0*np.ones([num_des/2,1])
         M = 0
+    elif prob == 4:
+        # 3bar Truss Problem
+        xI_lb = 1.0*np.ones([3,1]); xI_ub = 4.0*np.ones([3,1]) #Discrete material choice
+        M = 3
     return xI_lb, xI_ub, M
 
 def initialize_cont_test(num_des, prob):
@@ -30,6 +34,10 @@ def initialize_cont_test(num_des, prob):
     elif prob == 3:
         # Rosenbrock function
         xC_lb = -5.0*np.ones([num_des/2,1]); xC_ub = 10.0*np.ones([num_des/2,1])
+    elif prob == 4:
+        # 3bar Truss Problem
+        xC_lb = 1.0e-10*np.ones([3,1]); xC_ub = 10.0*np.ones([3,1]) #in [cm]
+
     return xC_lb, xC_ub
 
 class ModelInfo:

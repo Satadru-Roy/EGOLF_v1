@@ -17,7 +17,7 @@ from solver_MINLP import MINLP_BB
 from random import uniform
 import time
 
-num_des = 3 #Total number of design variables
+num_des = 6 #Total number of design variables
 prob = 4 # Problem type: 1. Branin 2. Griewank 3. Rosenbrock
 ################################################################################
 #Step 0: Initialize
@@ -45,8 +45,10 @@ if M>0:
 # Step 1: Generate a set of initial integer points
 # Use Latin Hypercube Sampling to generate the initial points
 # User supplied (in future use LHS). Provide num_xI+2 starting points
-x0I_01 = np.array([[0.0],[.76],[1.0]]) #2-D Problem with 1 int var.
-# x0I_01 = np.array([[0.0, 0.0],[0.31, 0.79],[0.61, 0.61],[1.0, 1.0]]) #4-D problem with 2 int var.
+if (prob == 1 or prob == 2 or prob ==3) and num_des == 2:
+    x0I_01 = np.array([[0.0],[.76],[1.0]]) #2-D Problem with 1 int var.
+elif prob == 4:
+    x0I_01 = np.array([[1.0, 0.25, 0.0],[0.25, 0.75, 1.0],[0.51, 0.0, 0.75],[0.75, 1.0, 0.51],[0.0, 0.51, 0.25]]) #3bar Truss (obtained using LHS of matlab)
 
 # Randomly generated initial integer points (Use LHS in the future release)
 # x0I_01 = np.zeros([n,num_xI])
@@ -69,13 +71,16 @@ for ii in xrange(n):
 
 print "x0I", x0I
 # print "x0I_hat", x0I_hat
-# time.sleep(3)
+# time.sleep(10)
 while ter_crit == 0:
     ############################################################################
     # Step 2: Perform the optimization w.r.t continuous design variables
     print "======================ContinuousOptimization-Start====================================="
     [xC_opt, obj, g, eflag, funCount] = continuous_optimization_test(x0I, M, num_des, prob)
     # [xC_opt, obj, g, eflag, funCount] = contopt_test_outOpenMDAO(x0I, M, num_des, prob)
+    print "foobar"
+    print eflag
+    exit()
     print "======================ContinuousOptimization-End======================================="
     ############################################################################
     # Step 3: Build the surrogate models
