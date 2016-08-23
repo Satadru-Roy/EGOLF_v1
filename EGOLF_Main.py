@@ -78,9 +78,6 @@ while ter_crit == 0:
     print "======================ContinuousOptimization-Start====================================="
     [xC_opt, obj, g, eflag, funCount] = continuous_optimization_test(x0I, M, num_des, prob)
     # [xC_opt, obj, g, eflag, funCount] = contopt_test_outOpenMDAO(x0I, M, num_des, prob)
-    print "foobar"
-    print eflag
-    exit()
     print "======================ContinuousOptimization-End======================================="
     ############################################################################
     # Step 3: Build the surrogate models

@@ -264,7 +264,8 @@ def combined_obj(xI,*param):
     ub_org = ModelInfo_obj.ub_org
     lb = ModelInfo_obj.lb
     ub = ModelInfo_obj.ub
-    # xval0 = (xI - lb_org)/(ub_org - lb_org)     # Normalize to a unit hypercube
+    
+    # xval = (xI - lb_org)/(ub_org - lb_org)     # Normalize to a unit hypercube
 
     xval = (xI - ModelInfo_obj.X_mean)/ModelInfo_obj.X_std # Normalized as per the convention in kriging of openmdao
 
@@ -349,7 +350,7 @@ def calc_conEV_norm(xval,ModelInfo_g,*param):
         EV = 0.0
     else:
         # Calculate expected violation
-        ei1 = (g_hat-g_min)*(0.5+0.5*erf((1.0/np.sqrt(2.0))*((g_hat-g_min)/np.sqrt(abs(gSSqr)))))
+        ei1 = (g_hat-g_min)*(0.5+0.5*erf((1.0/np.sqrt(2.0))*((g_hat-g_min)/np.sqrt(np.abs(gSSqr)))))
         ei2 = np.sqrt(np.abs(gSSqr))*(1.0/np.sqrt(2.0*np.pi))*np.exp(-0.5*((g_hat-g_min)**2/np.abs(gSSqr)))
         EV = (ei1 + ei2)
 
@@ -362,8 +363,8 @@ def gen_coeff_bound(xI_lb, xI_ub, ModelInfo):
     to normalized design space'''
 
     #Normalized to 0-1 hypercube
-    # xL_hat0 = (xI_lb - ModelInfo.lb_org)/(ModelInfo.ub_org - ModelInfo.lb_org)
-    # xU_hat0 = (xI_ub - ModelInfo.lb_org)/(ModelInfo.ub_org - ModelInfo.lb_org)
+    # xL_hat = (xI_lb - ModelInfo.lb_org)/(ModelInfo.ub_org - ModelInfo.lb_org)
+    # xU_hat = (xI_ub - ModelInfo.lb_org)/(ModelInfo.ub_org - ModelInfo.lb_org)
 
     #Normalized as per openmdao krigging model
     xL_hat = (xI_lb - ModelInfo.X_mean)/ModelInfo.X_std
@@ -645,35 +646,41 @@ def concave_factor(xL,xU):
 
 if __name__ == "__main__":
     # Test MINLP_BB with dummy inputs
-    xI_lb = np.array([[-5.0]])
-    xI_ub = np.array([[10.0]])
-    n=3
+    xI_lb = np.array([[1.0],[1.0],[1.0]])
+    xI_ub = np.array([[4.0],[4.0],[4.0]])
+    n=5
     num_xI = len(xI_lb)
     ModelInfo_obj = ModelInfo(xI_lb, xI_ub, num_xI)
-    ModelInfo_obj.X = np.array([[0.0],[0.46666667],[1.0]])
-    ModelInfo_obj.X_org = np.array([[-5.],[2.],[10.]])
-    ModelInfo_obj.xC = np.array([[15.0],[1.700754407672362],[3.002956561239675]])
-    ModelInfo_obj.y = np.array([[17.50829952],[6.0041112],[1.94314066]])
-    ModelInfo_obj.eflag = np.array([[1],[1],[1]])
-    ModelInfo_obj.y_best = 1.94314066
-    ModelInfo_obj.thetas = np.array([[1.93298254]]) #10.**np.array([[0.465979016183845]])
+    ModelInfo_obj.X = np.array([[1.0, 0.3333, 0.0],[0.3333,0.66667,1.0],[0.6667,0.0,0.6667],[0.6667,1.0,0.6667],[0.0,0.6667,0.3333]])
+    ModelInfo_obj.X_org = np.array([[4.0,2.0,1.0],[2.0,3.0,4.0],[3.0,1.0,3.0],[3.0,4.0,3.0],[1.0,3.0,4.0]])
+    ModelInfo_obj.xC = np.array([[10.5354,3.9769,-0.5354],[5.123,2.0374,1e-10],[5.2353,10,0.8641],[2.5176,9.9465,1e-10],[10,7.6254,5.0813]])
+    ModelInfo_obj.y = np.array([[17.6358],[5.83369],[11.3883],[13.8669],[15.6657]])
+    ModelInfo_obj.eflag = np.array([[-2],[1],[5],[1],[5]])
+    ModelInfo_obj.y_best = 5.8369
+    ModelInfo_obj.thetas = np.array([[-3.0],[-0.7837],[0.8241]]) #10.**np.array([[0.465979016183845]])
     ModelInfo_obj.p = 2
-    ModelInfo_obj.R_inv = np.array([[2.05347922, -1.76376406,  0.72060911],\
-    [-1.76376406,  3.01414418, -1.48406752],\
-    [0.72060911, -1.48406752,  1.75209773]])
-    ModelInfo_obj.SigmaSqr = 66.84799743
-    ModelInfo_obj.mu = 10.31398945
+    ModelInfo_obj.R_inv = np.array([[1.360479432971258,  -0.143414668885071,  0.108361045491168,   0.289847077490181, -0.812176679074090],\
+    [-0.143414668885071,   1.377512294282917,  -0.285503196753005,  -0.579539489572422,  0.393482009606974],\
+    [ 0.108361045491168,  -0.285503196753005,   3.664782422779223,  -2.821981603552740, -0.338668243357097],\
+    [ 0.289847077490181,  -0.579539489572422,  -2.821981603552740,   3.988757815245509, -0.721814851181005],\
+    [-0.812176679074090,   0.393482009606974,  -0.338668243357097,  -0.721814851181005,  1.846980282319067]])
+    ModelInfo_obj.SigmaSqr = 21.64238
+    ModelInfo_obj.mu = 12.5235
     ModelInfo_obj.c_r = ModelInfo_obj.R_inv.dot(ModelInfo_obj.y-(np.ones([n,1])*ModelInfo_obj.mu))
-    ModelInfo_obj.X_mean = 0.;ModelInfo_obj.X_std=1
-    ModelInfo_obj.Y_mean = 0.;ModelInfo_obj.Y_std=1
-    # xopt, fopt, eflag = MINLP_BB(xI_lb, xI_ub, ModelInfo_obj, [])
-    ModelInfo_obj.alpha = 2.75835168164
-    x_comL= np.array([[ 0.        ],[ 0.65641594],[ 0.65641593],[ 0.14471593]])
-    x_comU= np.array([[ 0.46666667],[ 1.        ],[ 1.        ],[ 0.57705012]])
-    xhat_comL= np.array([[ 0.],[ 0.],[ 0.],[ 0.]])
-    xhat_comU= np.array([[ 0.46666667],[ 1.        ],[ 1.        ],[ 1.        ]])
-    x_com = np.array([[0.233292711176682],[0.349656479929390],[0.349258214033471],[ 0.474123962414235]])
-    _ = calc_SSqr_convex(x_com,ModelInfo_obj,x_comL,x_comU,xhat_comL,xhat_comU)
+
+
+
+    # ModelInfo_obj.X_mean = 0.;ModelInfo_obj.X_std=1
+    # ModelInfo_obj.Y_mean = 0.;ModelInfo_obj.Y_std=1
+    # # xopt, fopt, eflag = MINLP_BB(xI_lb, xI_ub, ModelInfo_obj, [])
+    # ModelInfo_obj.alpha = 2.75835168164
+    # x_comL= np.array([[ 0.        ],[ 0.65641594],[ 0.65641593],[ 0.14471593]])
+    # x_comU= np.array([[ 0.46666667],[ 1.        ],[ 1.        ],[ 0.57705012]])
+    # xhat_comL= np.array([[ 0.],[ 0.],[ 0.],[ 0.]])
+    # xhat_comU= np.array([[ 0.46666667],[ 1.        ],[ 1.        ],[ 1.        ]])
+    # x_com = np.array([[0.233292711176682],[0.349656479929390],[0.349258214033471],[ 0.474123962414235]])
+    # _ = calc_SSqr_convex(x_com,ModelInfo_obj,x_comL,x_comU,xhat_comL,xhat_comU)
+    _ = MINLP_BB(xI_lb, xI_ub, ModelInfo_obj, ModelInfo_g)
     print xopt
     print fopt
     print eflag
