@@ -18,7 +18,7 @@ from random import uniform
 import time
 
 num_des = 6 #Total number of design variables
-prob = 4 # Problem type: 1. Branin 2. Griewank 3. Rosenbrock
+prob = 4 # Problem type: 1. Branin 2. Griewank 3. Rosenbrock 4. 3 Bar Truss problem
 ################################################################################
 #Step 0: Initialize
 iter = 1
@@ -46,9 +46,9 @@ if M>0:
 # Use Latin Hypercube Sampling to generate the initial points
 # User supplied (in future use LHS). Provide num_xI+2 starting points
 if (prob == 1 or prob == 2 or prob ==3) and num_des == 2:
-    x0I_01 = np.array([[0.0],[.76],[1.0]]) #2-D Problem with 1 int var.
+    x0I_01 = np.array([[0.0],[0.76],[1.0]]) #2-D Problem with 1 int var.
 elif prob == 4:
-    x0I_01 = np.array([[1.0, 0.25, 0.0],[0.25, 0.75, 1.0],[0.51, 0.0, 0.75],[0.75, 1.0, 0.51],[0.0, 0.51, 0.25]]) #3bar Truss (obtained using LHS of matlab)
+    x0I_01 = np.array([[1.0, 0.25, 0.75],[0.0, 0.75, 0.0],[0.75, 0.0, 0.25],[0.75, 1.0, 0.5],[0.25,0.5,1.0]]) #3bar Truss (obtained using LHS of matlab)
 
 # Randomly generated initial integer points (Use LHS in the future release)
 # x0I_01 = np.zeros([n,num_xI])
@@ -71,7 +71,7 @@ for ii in xrange(n):
 
 print "x0I", x0I
 # print "x0I_hat", x0I_hat
-# time.sleep(10)
+time.sleep(3)
 while ter_crit == 0:
     ############################################################################
     # Step 2: Perform the optimization w.r.t continuous design variables
@@ -106,7 +106,6 @@ while ter_crit == 0:
         if eflag[nonNAN] >= 1:
             fea_pt += 1
             FEA_obj = np.append(FEA_obj,obj[nonNAN]).reshape(fea_pt,1)
-            # print fea_pt, num_xI, num_xC
             FEA_xopt = np.append(FEA_xopt,np.concatenate((x0I[nonNAN,:],xC_opt[nonNAN,:]))).reshape(fea_pt,num_xI+num_xC)
     # Call the surrogate building function
     surrogate = KrigingSurrogate() #Use ModelInfo_obj in the future release
@@ -146,7 +145,6 @@ while ter_crit == 0:
         min_ind = FEA_obj.argmin()
         ModelInfo_obj.y_best = y_opt
         x_opt = FEA_xopt[min_ind]
-        print x_opt
 
     # Save all the date here
     ############################################################################

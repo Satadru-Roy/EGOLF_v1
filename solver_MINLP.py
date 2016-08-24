@@ -264,7 +264,7 @@ def combined_obj(xI,*param):
     ub_org = ModelInfo_obj.ub_org
     lb = ModelInfo_obj.lb
     ub = ModelInfo_obj.ub
-    
+
     # xval = (xI - lb_org)/(ub_org - lb_org)     # Normalize to a unit hypercube
 
     xval = (xI - ModelInfo_obj.X_mean)/ModelInfo_obj.X_std # Normalized as per the convention in kriging of openmdao
@@ -442,7 +442,7 @@ def lin_underestimator(lb, ub, ModelInfo):
 
     for i in xrange(n):
         #T1: Linearize under-estimator of ln[r_i] = a1[i,i]*r[i] + b1[i]
-        if ub_r[i] < 1e-323:
+        if ub_r[i] < 1.0e-323 or (ub_r[i] - lb_r[i]) < 1.0e-308:
             # a1[i,i] = 0.
             # b1[i] = -np.inf
             a1_hat[i,i] = 0.0 #a1[i,i]*(ub_r[i]-lb_r[i])
@@ -452,7 +452,7 @@ def lin_underestimator(lb, ub, ModelInfo):
             # b1[i] = np.log(ub_r[i])
             a1_hat[i,i] = 0.0 #a1[i,i]*(ub_r[i]-lb_r[i])
             b1_hat[i] = np.log(ub_r[i]) #a1[i,i]*lb_r[i] + b1[i]
-        elif lb_r[i] < 1e-323:
+        elif lb_r[i] < 1.0e-323:
             # a1[i,i] = np.inf
             # b1[i] = -np.inf
             a1_hat[i,i] = np.inf #a1[i,i]*(ub_r[i]-lb_r[i])
@@ -464,12 +464,12 @@ def lin_underestimator(lb, ub, ModelInfo):
             b1_hat[i] = a1[i,i]*lb_r[i] + b1[i]
 
         #T3: Linearize under-estimator of -ln[r_i] = a3[i,i]*r[i] + b3[i]
-        if ub_r[i] < 1e-323:
+        if ub_r[i] < 1.0e-323:
             a3_hat[i,i] = 0.0
             b3_hat[i] = np.inf
         else:
             r_m_i = (lb_r[i] + ub_r[i])/2.0
-            if r_m_i < 1e-308:
+            if r_m_i < 1.0e-308:
                 a3_hat[i,i] = -np.inf
                 b3_hat[i] = np.inf
             else:
@@ -537,7 +537,7 @@ def maximize_S(x_comL,x_comU,Ain_hat,bin_hat,ModelInfo):
     eig_lb = np.zeros([n,1])
     for ii in xrange(n):
         dia_ele = H_hat[ii,ii]
-        sum_rw = 0;sum_col=0
+        sum_rw = 0.0;sum_col=0.0
         for jj in xrange(n):
             if ii != jj:
                 sum_rw += np.abs(H_hat[ii,jj])
@@ -552,7 +552,7 @@ def maximize_S(x_comL,x_comU,Ain_hat,bin_hat,ModelInfo):
     x0 = 0.5*(xhat_comL + xhat_comU)
     bnds = [(xhat_comL[ii], xhat_comU[ii]) for ii in xrange(len(xhat_comL))]
     #Note: Python defines constraints like g(x) >= 0
-    cons = [{'type' : 'ineq','fun' : lambda x : -np.dot(Ain_hat[ii],x) + bin_hat[ii],'jac': lambda x:-Ain_hat[ii]} for ii in xrange(2*n)]
+    cons = [{'type' : 'ineq','fun' : lambda x : -np.dot(Ain_hat[ii,:],x) + bin_hat[ii,0],'jac': lambda x:-Ain_hat[ii,:]} for ii in xrange(2*n)]
     optResult = minimize(calc_SSqr_convex,x0,\
     args=(ModelInfo,x_comL,x_comU,xhat_comL,xhat_comU),method='SLSQP',\
     constraints=cons,bounds=bnds,options={'ftol':1e-12,'maxiter':100})
@@ -561,6 +561,10 @@ def maximize_S(x_comL,x_comU,Ain_hat,bin_hat,ModelInfo):
         eflag_sU=0.0
     else:
         eflag_sU=1.0
+        for ii in xrange(2*n):
+            if np.dot(Ain_hat[ii,:],optResult.x) >  (bin_hat[ii,0] + 1.0e-6):
+                eflag_sU=0.0
+                break
     sU = - Neg_sU
     return sU, eflag_sU
 ################################################################################
@@ -602,15 +606,19 @@ def minimize_y(x_comL, x_comU, Ain_hat, bin_hat, ModelInfo):
     if app == 1:
         x0 = 0.5*(xhat_comL+xhat_comU)
         bnds = [(xhat_comL[ii], xhat_comU[ii]) for ii in xrange(len(xhat_comL))]
-        cons = [{'type' : 'ineq','fun' : lambda x : -np.dot(Ain_hat[ii],x) + bin_hat[ii],'jac': lambda x:-Ain_hat[ii]} for ii in xrange(2*n)]
+        cons = [{'type' : 'ineq','fun' : lambda x : -np.dot(Ain_hat[ii,:],x) + bin_hat[ii,0],'jac': lambda x:-Ain_hat[ii,:]} for ii in xrange(2*n)]
         optResult = minimize(calc_y_hat_convex,x0,\
         args=(x_comL,x_comU,ModelInfo),method='SLSQP',\
         constraints=cons,bounds=bnds,options={'ftol':1e-12,'maxiter':100})
         yL = optResult.fun
         if not optResult.success:
-            eflag_yL=0
+            eflag_yL=0.0
         else:
-            eflag_yL=1
+            eflag_yL=1.0
+            for ii in xrange(2*n):
+                if np.dot(Ain_hat[ii,:],optResult.x) >  (bin_hat[ii,0] + 1.0e-6):
+                    eflag_yL=0.0
+                    break
     return yL, eflag_yL
 ################################################################################
 def calc_y_hat_convex(x_com,*param):

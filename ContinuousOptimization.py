@@ -206,17 +206,21 @@ def continuous_optimization_test(x0I, M, num_des, prob):
         top.setup()
         top.run()
         # data = top.check_partial_derivatives(out_stream=sys.stdout)
-        print "Minimum found f = ",top['copt.f']
-        print "at xC = ",top['copt.xC']
-        print "for the given xI = ", top['copt.xI']
-        if prob == 4:
-            print "Constraint values g = ", top['copt_cons.g'].T
         xC_opt[ii] = top['copt.xC']
         obj[ii] = top['copt.f']
         eflag[ii] = top.driver.exit_flag
         funCount[ii] = root.copt.nfev
-        g[ii] = top['copt_cons.g'].T
-
+        print "Minimum found f = ",top['copt.f']
+        print "at xC = ",top['copt.xC']
+        print "for the given xI = ", top['copt.xI']
+        if M>0:
+            g[ii] = top['copt_cons.g'].T
+            print "Constraint values g = ", top['copt_cons.g'].T
+            for mm in xrange(M): #Additional check to set exit flag 0 if constraints are violated
+                if g[ii,mm]>1.0e-6:
+                    eflag[ii] = 0.0
+                    break
+        print "Exit flag: ", eflag[ii]
     return xC_opt, obj, g, eflag, funCount
 
 #Testing module to perform optimization outside OpenMDAO
