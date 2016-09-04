@@ -179,7 +179,7 @@ def MINLP_BB(xI_lb, xI_ub, ModelInfo_obj, ModelInfo_g):
                         if M>0:
                             # Expected violation goes here
                             for mm in xrange(M):
-                                x_comL, x_comU, Ain_hat, bin_hat = gen_coeff_bound(lb,ub,ModelInfo_obj)
+                                x_comL, x_comU, Ain_hat, bin_hat = gen_coeff_bound(lb,ub,ModelInfo_g[mm])
                                 sU_g, eflag_sU_g = maximize_S(x_comL, x_comU, Ain_hat, bin_hat, ModelInfo_g[mm])
                                 sL_g = -1.*sU_g
                                 if eflag_sU_g >= 1:
@@ -267,7 +267,7 @@ def combined_obj(xI,*param):
 
     # xval = (xI - lb_org)/(ub_org - lb_org)     # Normalize to a unit hypercube
 
-    xval = (xI - ModelInfo_obj.X_mean)/ModelInfo_obj.X_std # Normalized as per the convention in kriging of openmdao
+    xval = ((xI.reshape(k,1) - ModelInfo_obj.X_mean)/ModelInfo_obj.X_std) # Normalized as per the convention in kriging of openmdao
 
     NegEI = calc_conEI_norm(xval,ModelInfo_obj)
 
@@ -290,6 +290,7 @@ def calc_conEI_norm(xval,ModelInfo_obj,*param):
     '''This modules evaluates the expected improvement in the normalized
     design sapce'''
     y_min = (ModelInfo_obj.y_best - ModelInfo_obj.Y_mean)/ModelInfo_obj.Y_std
+
     # y_min = ModelInfo_obj.y_best
     X = ModelInfo_obj.X
     if len(param) == 0:
@@ -555,7 +556,7 @@ def maximize_S(x_comL,x_comU,Ain_hat,bin_hat,ModelInfo):
     cons = [{'type' : 'ineq','fun' : lambda x : -np.dot(Ain_hat[ii,:],x) + bin_hat[ii,0],'jac': lambda x:-Ain_hat[ii,:]} for ii in xrange(2*n)]
     optResult = minimize(calc_SSqr_convex,x0,\
     args=(ModelInfo,x_comL,x_comU,xhat_comL,xhat_comU),method='SLSQP',\
-    constraints=cons,bounds=bnds,options={'ftol':1e-12,'maxiter':100})
+    constraints=cons,bounds=bnds,options={'ftol':1e-12,'maxiter':10000})
     Neg_sU = optResult.fun
     if not optResult.success:
         eflag_sU=0.0
@@ -609,7 +610,7 @@ def minimize_y(x_comL, x_comU, Ain_hat, bin_hat, ModelInfo):
         cons = [{'type' : 'ineq','fun' : lambda x : -np.dot(Ain_hat[ii,:],x) + bin_hat[ii,0],'jac': lambda x:-Ain_hat[ii,:]} for ii in xrange(2*n)]
         optResult = minimize(calc_y_hat_convex,x0,\
         args=(x_comL,x_comU,ModelInfo),method='SLSQP',\
-        constraints=cons,bounds=bnds,options={'ftol':1e-12,'maxiter':100})
+        constraints=cons,bounds=bnds,options={'ftol':1e-12,'maxiter':10000})
         yL = optResult.fun
         if not optResult.success:
             eflag_yL=0.0

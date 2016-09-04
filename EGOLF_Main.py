@@ -48,7 +48,7 @@ if M>0:
 if (prob == 1 or prob == 2 or prob ==3) and num_des == 2:
     x0I_01 = np.array([[0.0],[0.76],[1.0]]) #2-D Problem with 1 int var.
 elif prob == 4:
-    x0I_01 = np.array([[1.0, 0.25, 0.75],[0.0, 0.75, 0.0],[0.75, 0.0, 0.25],[0.75, 1.0, 0.5],[0.25,0.5,1.0]]) #3bar Truss (obtained using LHS of matlab)
+    x0I_01 = np.array([[0.0, 0.51, 0.75],[0.75, 1.0, 1.0],[0.0, 0.75, 0.0],[0.25, 0.0, 0.25],[1.0,0.25,0.51]]) #3bar Truss (obtained using LHS of matlab)
 
 # Randomly generated initial integer points (Use LHS in the future release)
 # x0I_01 = np.zeros([n,num_xI])
