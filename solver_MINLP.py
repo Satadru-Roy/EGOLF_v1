@@ -267,7 +267,7 @@ def combined_obj(xI,*param):
 
     # xval = (xI - lb_org)/(ub_org - lb_org)     # Normalize to a unit hypercube
 
-    xval = (xI - ModelInfo_obj.X_mean)/ModelInfo_obj.X_std # Normalized as per the convention in kriging of openmdao
+    xval = (xI - ModelInfo_obj.X_mean.T)/ModelInfo_obj.X_std.T # Normalized as per the convention in kriging of openmdao
 
     NegEI = calc_conEI_norm(xval,ModelInfo_obj)
 
