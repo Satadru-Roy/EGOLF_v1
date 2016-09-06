@@ -147,6 +147,21 @@ while ter_crit == 0:
         x_opt = FEA_xopt[min_ind]
 
     # Save all the date here
+    # print "foobar-Print data for Matlab"
+    # print xI_lb, xI_ub
+    # print M
+    # print surrogate.Y
+    # print ModelInfo_g[0].X
+    # print ModelInfo_g[0].thetas
+    # print ModelInfo_g[0].mu
+    # print ModelInfo_g[0].SigmaSqr
+    # print ModelInfo_g[0].c_r
+    # print ModelInfo_g[0].R_inv
+    # print ModelInfo_g[0].Y_mean
+    # print ModelInfo_g[0].Y_std
+    # print ModelInfo_g[0].X_std
+    # print ModelInfo_g[0].X_mean
+    # exit()
     ############################################################################
     # Step 4: Maximize the expected improvement function to obtain an integer infill points
     # Choose the solver: 1. MINLP BB, 2. GA, 3. Both MINLP BB & GA

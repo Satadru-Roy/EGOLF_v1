@@ -4,6 +4,7 @@ from scipy.special import erf
 from Initialization import ModelInfo
 from scipy.optimize import minimize
 import time
+from random import uniform
 
 def MINLP_BB(xI_lb, xI_ub, ModelInfo_obj, ModelInfo_g):
     ''' This is the branch and bound algorithm that maximizes the
@@ -34,16 +35,15 @@ def MINLP_BB(xI_lb, xI_ub, ModelInfo_obj, ModelInfo_g):
     tol_ec=1e-6
     term=0
     LBD=-np.inf
-    floc_iter=np.inf
     node_num=0
     fopt=np.inf
     can_pt=0
-    xopt=[];canX=[];canF=[];UBD_iter=[]
+    canX=[];canF=[];UBD_iter=[]
     Aset=[]; #Note: Active set fields: Aset = [[NodeNumber, lb, ub, LBD, UBD],[],..] #Each node is a list
     xL_iter=cp.deepcopy(xI_lb);xU_iter=cp.deepcopy(xI_ub)
-    eflag_MINLPBB=0
     par_node=0
     LBD_prev=-np.inf
+    fC = 0.0
     heur_search=0 # Set this to 1 for good starting point using heuristic search;
     # otherwise set this to 0
 
@@ -54,8 +54,13 @@ def MINLP_BB(xI_lb, xI_ub, ModelInfo_obj, ModelInfo_g):
         # Heuristic search goes here ...
         print "Heuristic search in on....."
     else:
-        UBD = np.inf
-
+        #Randomly generate an integer point
+        # xopt = np.round(xI_lb + uniform(0,1)*(xI_ub - xI_lb))
+        xopt = np.array([[9]])
+        fopt = combined_obj(xopt,ModelInfo_obj,ModelInfo_g,[],0)
+        fC+=1.0
+        UBD = 1.0*fopt
+        eflag_MINLPBB = 1.0
     print "====================================================================================="
     print "%19s%12s%14s%21s" %("Global","Parent","Child1","Child2")
     print "%s%8s%10s%8s%9s%11s%10s%11s%11s" %("Iter","LBD","UBD","Node", \
@@ -63,117 +68,70 @@ def MINLP_BB(xI_lb, xI_ub, ModelInfo_obj, ModelInfo_g):
     print "====================================================================================="
 
     while term == 0:
-        int_flag = 0
         con_fac=[] #concave_factor(xL_iter,xU_iter)
         con_flag = 0
-        if np.linalg.norm(xL_iter-xU_iter) <= 1e-6:
-            can_pt+=1
-            xloc_iter = cp.deepcopy(xL_iter)
+        #Step 2: Obtain a local solution
+        app_step2 = 1 #1-Uses gradient based approach
+        loc_search = 0 #0-No local search, 1-local search
+        if app_step2 == 1:
+            xloc_iter = np.round(0.5*(xU_iter+xL_iter))
             floc_iter = combined_obj(xloc_iter,ModelInfo_obj,ModelInfo_g,con_fac,con_flag)
-            canX = np.reshape(np.append(canX,xloc_iter),(can_pt,num_des))
-            canF = np.reshape(np.append(canF,floc_iter),(can_pt,1))
-            if floc_iter < UBD: #Better solution found
-                UBD = floc_iter
-                fopt = UBD
-                xopt = cp.deepcopy(xloc_iter).reshape(1,num_des)
-                eflag_MINLPBB = 1
-                # Update active set: Removes the current node
-                if len(Aset) >= 1:
-                    del_flag = []
-                    for aaa in xrange(len(Aset)):
-                        if Aset[aaa][3] >= UBD:
-                            del_flag.extend([aaa])
-                    Aset = [ii for jj, ii in enumerate(Aset) if jj not in del_flag]
-                    # print del_flag
-        else:
-            #Step 2: Obtain a local solution
-            app_step2 = 1 #1-Uses gradient based approach
-            if app_step2 == 1:
-                xC_iter = 0.5*(xU_iter+xL_iter)
-                bnds = [(xL_iter[ii], xU_iter[ii]) for ii in xrange(num_des)]
-                optResult = minimize(combined_obj,xC_iter,\
-                args=(ModelInfo_obj,ModelInfo_g,con_fac,con_flag), method='SLSQP',\
-                bounds=bnds, options={'ftol':1e-12})
-                xloc_iter = optResult.x.reshape(num_des,1)
-                floc_iter = optResult.fun
-                if not optResult.success:
-                    efloc_iter=0
-                    floc_iter = np.inf
-                else:
-                    efloc_iter=1
-            #elif app_step2 == 2: Other methods goes here
+            efloc_iter = 1.0
+            fC+=1.0
+            if loc_search == 1: #Perform the local search
+                if np.abs(floc_iter) > 1.0e-6:
+                    bnds = [(xL_iter[ii], xU_iter[ii]) for ii in xrange(num_des)]
+                    optResult = minimize(combined_obj,xC_iter,\
+                    args=(ModelInfo_obj,ModelInfo_g,con_fac,con_flag), method='SLSQP',\
+                    bounds=bnds, options={'ftol':1e-12})
+                    xloc_iter = np.round(optResult.x.reshape(num_des,1))
+                    floc_iter = combined_obj(xloc_iter,ModelInfo_obj,ModelInfo_g,con_fac,con_flag)
+                    fC+= 1.0+optResult.nfev
+                    if not optResult.success:
+                        efloc_iter=0
+                        floc_iter = np.inf
+                    else:
+                        efloc_iter=1.0
+        #elif app_step2 == 2: Other methods goes here
 
-            # Round any close to integer value to integer solution
-            for aa in xrange(len(xloc_iter)):
-                if np.abs(np.round(xloc_iter[aa])-xloc_iter[aa]) <=1e-6:
-                    xloc_iter[aa] = np.round(xloc_iter[aa])
+        # Step 3: Partition the current rectangle as per the new branching scheme
+        child_info = np.zeros([2,3])
+        dis_flag = [' ',' ']
+        for ii in xrange(2):
+            lb = cp.deepcopy(xL_iter)
+            ub = cp.deepcopy(xU_iter)
+            l_iter = (xU_iter - xL_iter).argmax()
+            if xloc_iter[l_iter]<ub[l_iter]:
+                delta = 0.5 #0<delta<1
+            else:
+                delta = -0.5 #-1<delta<0
+            if ii == 0:
+                ub[l_iter] = np.floor(xloc_iter[l_iter]+delta)
+            elif ii == 1:
+                lb[l_iter] = np.ceil(xloc_iter[l_iter]+delta)
 
-            if np.linalg.norm(xloc_iter - np.round(xloc_iter)) <= 1e-6 and efloc_iter >= 1: #Integer solution found
-                int_flag = 1
-                can_pt+=1
-                canX = np.reshape(np.append(canX,xloc_iter),(can_pt,num_des))
-                canF = np.reshape(np.append(canF,floc_iter),(can_pt,1))
-                if floc_iter < UBD: # Better integer solution found
-                    UBD = 1.0*floc_iter
-                    fopt = 1.0*UBD
-                    xopt = cp.deepcopy(xloc_iter).reshape(1,num_des)
-                    eflag_MINLPBB = 1
-                    # Update active set
-                    if len(Aset) >= 1:
-                        del_flag = []
-                        for aaa in xrange(len(Aset)):
-                            if Aset[aaa][3] >= UBD:
-                                del_flag.extend([aaa])
-                        Aset = [ii for jj, ii in enumerate(Aset) if jj not in del_flag]
-                        # print del_flag
-
-            UBD_iter = np.append(UBD_iter,UBD)
-            # Step 3: Partition the current rectangle as per the new branching scheme
-            child_info = np.zeros([2,3])
-            dis_flag = [' ',' ']
-            for ii in xrange(2):
-                lb = cp.deepcopy(xL_iter)
-                ub = cp.deepcopy(xU_iter)
-
-                if efloc_iter >= 1:
-                    if int_flag == 0: #Case 1: Not an integer sol. Branch at variable farthest from the integer value
-                        l_iter = np.abs(np.round(xloc_iter)-xloc_iter).argmax()
-                        if ii == 0:
-                            ub[l_iter] = np.floor(xloc_iter[l_iter])
-                        elif ii == 1:
-                            lb[l_iter] = np.ceil(xloc_iter[l_iter])
-                    elif int_flag == 1: #Case 2: Integer sol. Branch at variable with the largest edge
-                        l_iter = (xU_iter - xL_iter).argmax()
-                        if ii == 0:
-                            if lb[l_iter] < xloc_iter[l_iter]:
-                                ub[l_iter] = xloc_iter[l_iter] - 1 #Bound shifted by 1 unit to the left
-                            else:
-                                ub[l_iter] = 1.0*lb[l_iter]
-                        elif ii == 1:
-                            if ub[l_iter] > xloc_iter[l_iter]:
-                                lb[l_iter] = xloc_iter[l_iter] + 1 #Bound shifted by 1 unit to the right
-                            else:
-                                lb[l_iter] = 1.0*ub[l_iter]
-                else:
-                    l_iter = (xU_iter - xL_iter).argmax() #Branch at variable with largest edge
-                    if ii == 0:
-                        ub[l_iter] = np.floor(0.5*(xU_iter[l_iter]+xL_iter[l_iter]))
-                    elif ii == 1:
-                        lb[l_iter] = np.ceil(0.5*(xU_iter[l_iter]+xL_iter[l_iter]))
-
+            # print lb, ub
+            if np.linalg.norm(xL_iter-xU_iter) > 1e-6: #Not a point
                 # Step 4: Obtain an LBD of f in the newly created node
                 S4_fail = 0
                 x_comL, x_comU, Ain_hat, bin_hat = gen_coeff_bound(lb,ub,ModelInfo_obj)
                 sU, eflag_sU = maximize_S(x_comL, x_comU, Ain_hat, bin_hat, ModelInfo_obj)
                 # print "foobar-step4 LBD"
+                # print "foobar-Smax"
+                # print x_comL, x_comU, Ain_hat, bin_hat
                 # print sU, eflag_sU
+                # exit()
                 if eflag_sU >= 1:
                     yL, eflag_yL = minimize_y(x_comL, x_comU, Ain_hat, bin_hat, ModelInfo_obj)
+                    # print "foobar-ymin"
                     # print yL, eflag_yL
                     # exit()
                     if eflag_yL >= 1:
                         NegEI = calc_conEI_norm([],ModelInfo_obj,sU,yL)
-
+                        # print "foobar-NegEI after yL calc"
+                        # print NegEI
+                        # if ii==1:
+                        #     exit()
                         M = len(ModelInfo_g)
                         EV = np.zeros([M,1])
                         if M>0:
@@ -187,16 +145,17 @@ def MINLP_BB(xI_lb, xI_ub, ModelInfo_obj, ModelInfo_g):
                                     if eflag_yL_g >= 1:
                                         EV[mm] = calc_conEV_norm([],ModelInfo_g[mm],sL_g,yL_g)
                                     else:
-                                        S4_fail = 1.
+                                        S4_fail = 1.0
                                         break
                                 else:
-                                    S4_fail = 1
+                                    S4_fail = 1.0
+                                    break
                     else:
                         # print "Cannot solve Min y_hat problem!"
-                        S4_fail = 1
+                        S4_fail = 1.0
                 else:
                     # print "Cannot solve Max S problem!"
-                    S4_fail = 1
+                    S4_fail = 1.0
 
                 if S4_fail == 1: #Convex approximation failed!
                     if efloc_iter >= 1:
@@ -215,17 +174,45 @@ def MINLP_BB(xI_lb, xI_ub, ModelInfo_obj, ModelInfo_g):
                     child_info[ii] = np.array([node_num, LBD_NegConEI, floc_iter])
                 else:
                     child_info[ii] = np.array([par_node, LBD_NegConEI, floc_iter])
+                    dis_flag[ii] = 'X' #Flag for child created but not added to active set (fathomed)
+            else:
+                xloc_iter = lb
+                floc_iter = combined_obj(xloc_iter,ModelInfo_obj,ModelInfo_g,con_fac,con_flag)
+                fC+=1.0
+                child_info[ii] = np.array([par_node, LBD_NegConEI, floc_iter])
+                dis_flag[ii] = 'x' #Flag for No child created
 
-            if iter_ % 25 == 0:
-                # Display output in a tabular format
-                print "====================================================================================="
-                print "%19s%12s%14s%21s" %("Global","Parent","Child1","Child2")
-                print "%s%8s%10s%8s%9s%11s%10s%11s%11s" %("Iter","LBD","UBD","Node", \
-                "Node1","LBD1","Node2","LBD2","Flocal")
-                print "====================================================================================="
-            print "%3d%10.2f%10.2f%6d%8d%1s%13.2f%8d%1s%13.2f%9.2f" %(iter_,LBD,UBD,\
-            par_node,child_info[0,0],dis_flag[0],child_info[0,1],\
-            child_info[1,0],dis_flag[1],child_info[1,1],child_info[1,2])
+            #Update the active set
+            can_pt+=1
+            canX = np.reshape(np.append(canX,xloc_iter),(can_pt,num_des))
+            canF = np.reshape(np.append(canF,floc_iter),(can_pt,1))
+            if floc_iter < UBD: # Better integer solution found
+                UBD = 1.0*floc_iter
+                fopt = 1.0*UBD
+                xopt = cp.deepcopy(xloc_iter).reshape(1,num_des)
+                if len(Aset) >= 1:
+                    del_flag = []
+                    for aaa in xrange(len(Aset)):
+                        if Aset[aaa][3] >= UBD:
+                            del_flag.extend([aaa])
+                    Aset = [ii for jj, ii in enumerate(Aset) if jj not in del_flag]
+                    # print del_flag
+                UBD_iter = np.append(UBD_iter,UBD)
+
+        # print "foobar-loop end check"
+        # print xloc_iter, floc_iter
+        # print Aset, S4_fail
+        # exit()
+        if iter_ % 25 == 0:
+            # Display output in a tabular format
+            print "====================================================================================="
+            print "%19s%12s%14s%21s" %("Global","Parent","Child1","Child2")
+            print "%s%8s%10s%8s%9s%11s%10s%11s%11s" %("Iter","LBD","UBD","Node", \
+            "Node1","LBD1","Node2","LBD2","Flocal")
+            print "====================================================================================="
+        print "%3d%10.2f%10.2f%6d%8d%1s%13.2f%8d%1s%13.2f%9.2f" %(iter_,LBD,UBD,\
+        par_node,child_info[0,0],dis_flag[0],child_info[0,1],\
+        child_info[1,0],dis_flag[1],child_info[1,1],child_info[1,2])
 
         if len(Aset) >= 1:
             # Update LBD and select the current rectangle
@@ -250,7 +237,7 @@ def MINLP_BB(xI_lb, xI_ub, ModelInfo_obj, ModelInfo_g):
             term = 1
             print "====================================================================================="
             print "Terminating! No new node to explore."
-
+    print "EI fun count: ", fC
     return xopt, fopt, eflag_MINLPBB
 #End MINLP_BB
 ################################################################################
@@ -267,7 +254,7 @@ def combined_obj(xI,*param):
 
     # xval = (xI - lb_org)/(ub_org - lb_org)     # Normalize to a unit hypercube
 
-    xval = ((xI.reshape(k,1) - ModelInfo_obj.X_mean)/ModelInfo_obj.X_std) # Normalized as per the convention in kriging of openmdao
+    xval = (xI - ModelInfo_obj.X_mean.T)/ModelInfo_obj.X_std.T # Normalized as per the convention in kriging of openmdao
 
     NegEI = calc_conEI_norm(xval,ModelInfo_obj)
 
@@ -284,6 +271,7 @@ def combined_obj(xI,*param):
             P += con_fac[ii]*(lb[ii] - xval[ii])*(ub[ii] - xval[ii])
 
     f = conNegEI + P
+
     return f
 ################################################################################
 def calc_conEI_norm(xval,ModelInfo_obj,*param):
@@ -556,7 +544,7 @@ def maximize_S(x_comL,x_comU,Ain_hat,bin_hat,ModelInfo):
     cons = [{'type' : 'ineq','fun' : lambda x : -np.dot(Ain_hat[ii,:],x) + bin_hat[ii,0],'jac': lambda x:-Ain_hat[ii,:]} for ii in xrange(2*n)]
     optResult = minimize(calc_SSqr_convex,x0,\
     args=(ModelInfo,x_comL,x_comU,xhat_comL,xhat_comU),method='SLSQP',\
-    constraints=cons,bounds=bnds,options={'ftol':1e-12,'maxiter':10000})
+    constraints=cons,bounds=bnds,options={'ftol':1e-12,'maxiter':100})
     Neg_sU = optResult.fun
     if not optResult.success:
         eflag_sU=0.0
@@ -567,6 +555,10 @@ def maximize_S(x_comL,x_comU,Ain_hat,bin_hat,ModelInfo):
                 eflag_sU=0.0
                 break
     sU = - Neg_sU
+    # print "foobar-Max S check"
+    # print alpha, x0
+    # print sU, eflag_sU
+    # exit()
     return sU, eflag_sU
 ################################################################################
 def calc_SSqr_convex(x_com,*param):
@@ -610,16 +602,22 @@ def minimize_y(x_comL, x_comU, Ain_hat, bin_hat, ModelInfo):
         cons = [{'type' : 'ineq','fun' : lambda x : -np.dot(Ain_hat[ii,:],x) + bin_hat[ii,0],'jac': lambda x:-Ain_hat[ii,:]} for ii in xrange(2*n)]
         optResult = minimize(calc_y_hat_convex,x0,\
         args=(x_comL,x_comU,ModelInfo),method='SLSQP',\
-        constraints=cons,bounds=bnds,options={'ftol':1e-12,'maxiter':10000})
+        constraints=cons,bounds=bnds,options={'ftol':1e-12,'maxiter':100})
         yL = optResult.fun
         if not optResult.success:
             eflag_yL=0.0
         else:
             eflag_yL=1.0
             for ii in xrange(2*n):
+                # print np.dot(Ain_hat[ii,:],optResult.x) - bin_hat[ii,0]
                 if np.dot(Ain_hat[ii,:],optResult.x) >  (bin_hat[ii,0] + 1.0e-6):
                     eflag_yL=0.0
                     break
+    # print "foobar-Min y check"
+    # print x0
+    # print yL, eflag_yL
+    # print
+    # exit()
     return yL, eflag_yL
 ################################################################################
 def calc_y_hat_convex(x_com,*param):
@@ -632,10 +630,15 @@ def calc_y_hat_convex(x_com,*param):
 
     rL = x_comL[k:]
     rU = x_comU[k:]
-    rhat = np.array([x_com[k:]]).reshape(n,1)
+    rhat = np.array([x_com[k:]]).reshape(n,1) #TODO remove scaling of 'r'
     r = rL + rhat*(rU - rL)
 
     y_hat = mu + np.dot(r.T,c_r)
+    # print "foobar-calc_y check"
+    # print x_com, rhat
+    # print mu, r, c_r
+    # print y_hat
+    # exit()
     return y_hat[0,0]
 ################################################################################
 def concave_factor(xL,xU):
