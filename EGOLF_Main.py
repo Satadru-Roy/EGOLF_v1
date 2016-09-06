@@ -17,8 +17,8 @@ from solver_MINLP import MINLP_BB
 from random import uniform
 import time
 
-num_des = 2 #Total number of design variables
-prob = 3 # Problem type: 1. Branin 2. Griewank 3. Rosenbrock
+num_des = 6 #Total number of design variables
+prob = 4 # Problem type: 1. Branin 2. Griewank 3. Rosenbrock 4. 3 Bar Truss problem
 ################################################################################
 #Step 0: Initialize
 iter = 1
@@ -26,7 +26,7 @@ ter_crit = 0;Tot_pt_prev = 0;y_opt = 0.0;num_pt = 0;fea_pt = 0;Tot_newpt_added =
 Tot_FunCount = 0;ec2 = 0;ei_max = 0.0
 ei_tol_per = 0.001
 ei_tol_abs = 0.001
-new_sol = [];comp = [];FEA_obj = [];FEA_xopt = []; ModelInfo_obj=[];ModelInfo_g=[]
+new_sol = [];comp = [];FEA_obj = [];FEA_xopt = []; ModelInfo_obj=[]
 y_opt = np.inf
 
 [xI_lb,xI_ub,M] = initialize_test(num_des, prob)
@@ -36,6 +36,7 @@ n = num_xI + 2 # Number of starting points
 num_xC = num_des - num_xI
 
 ModelInfo_obj = ModelInfo(xI_lb, xI_ub, num_xI)
+ModelInfo_g=[[]]*M
 if M>0:
     for mm in xrange(M):
         ModelInfo_g[mm] = ModelInfo(xI_lb, xI_ub, num_xI)
@@ -44,8 +45,10 @@ if M>0:
 # Step 1: Generate a set of initial integer points
 # Use Latin Hypercube Sampling to generate the initial points
 # User supplied (in future use LHS). Provide num_xI+2 starting points
-x0I_01 = np.array([[0.0],[.76],[1.0]]) #2-D Problem with 1 int var.
-# x0I_01 = np.array([[0.0, 0.0],[0.31, 0.79],[0.61, 0.61],[1.0, 1.0]]) #4-D problem with 2 int var.
+if (prob == 1 or prob == 2 or prob ==3) and num_des == 2:
+    x0I_01 = np.array([[0.0],[0.76],[1.0]]) #2-D Problem with 1 int var.
+elif prob == 4:
+    x0I_01 = np.array([[0.0, 0.51, 0.75],[0.75, 1.0, 1.0],[0.0, 0.75, 0.0],[0.25, 0.0, 0.25],[1.0,0.25,0.51]]) #3bar Truss (obtained using LHS of matlab)
 
 # Randomly generated initial integer points (Use LHS in the future release)
 # x0I_01 = np.zeros([n,num_xI])
@@ -68,7 +71,7 @@ for ii in xrange(n):
 
 print "x0I", x0I
 # print "x0I_hat", x0I_hat
-# time.sleep(3)
+time.sleep(3)
 while ter_crit == 0:
     ############################################################################
     # Step 2: Perform the optimization w.r.t continuous design variables
@@ -86,24 +89,29 @@ while ter_crit == 0:
 
         # Surrogate data for the objective function
         # if num_pt==5:
-        ModelInfo_obj.X_hat = np.append(ModelInfo_obj.X_hat,x0I_hat[nonNAN]).reshape(num_pt,num_xI)
+        # ModelInfo_obj.X_hat = np.append(ModelInfo_obj.X_hat,x0I_hat[nonNAN]).reshape(num_pt,num_xI)
         ModelInfo_obj.X_org = np.append(ModelInfo_obj.X_org,x0I[nonNAN]).reshape(num_pt,num_xI)
         ModelInfo_obj.xC = np.append(ModelInfo_obj.xC,xC_opt[nonNAN]).reshape(num_pt,num_xC)
         ModelInfo_obj.y = np.append(ModelInfo_obj.y,obj[nonNAN]).reshape(num_pt,1)
         ModelInfo_obj.eflag = np.append(ModelInfo_obj.eflag,eflag[nonNAN]).reshape(num_pt,1)
         # Surrogate data for the constraint functions
-        # Goes here ....
+        if M>0:
+            for mm in xrange(M):
+                # Put a check here to ensure cons are never NaN or imaginary
+                # ModelInfo_g[mm].X_hat = np.append(ModelInfo_g[mm].X_hat,x0I_hat[nonNAN]).reshape(num_pt,num_xI)
+                ModelInfo_g[mm].X_org = np.append(ModelInfo_g[mm].X_org,x0I[nonNAN]).reshape(num_pt,num_xI)
+                ModelInfo_g[mm].y = np.append(ModelInfo_g[mm].y,g[nonNAN,mm]).reshape(num_pt,1)
+
 
         if eflag[nonNAN] >= 1:
             fea_pt += 1
             FEA_obj = np.append(FEA_obj,obj[nonNAN]).reshape(fea_pt,1)
-            FEA_xopt = np.append(FEA_xopt,[x0I[nonNAN],xC_opt[nonNAN]]).reshape(fea_pt,num_xI+num_xC)
-
+            FEA_xopt = np.append(FEA_xopt,np.concatenate((x0I[nonNAN,:],xC_opt[nonNAN,:]))).reshape(fea_pt,num_xI+num_xC)
     # Call the surrogate building function
     surrogate = KrigingSurrogate() #Use ModelInfo_obj in the future release
     surrogate.train(ModelInfo_obj.X_org, ModelInfo_obj.y)
     ModelInfo_obj.X = surrogate.X
-    ModelInfo_obj.ynorm = surrogate.Y
+    # ModelInfo_obj.ynorm = surrogate.Y
     ModelInfo_obj.thetas = surrogate.thetas
     ModelInfo_obj.mu = np.mean(surrogate.Y) #This value should always be 0.0
     ModelInfo_obj.SigmaSqr = surrogate.sigma2/np.square(surrogate.Y_std) #This value should always be 1.0
@@ -113,10 +121,24 @@ while ter_crit == 0:
     ModelInfo_obj.Y_std = surrogate.Y_std
     ModelInfo_obj.X_std = surrogate.X_std.reshape(num_xI,1)
     ModelInfo_obj.X_mean = surrogate.X_mean.reshape(num_xI,1)
-    print "\nSurrogate building of the objective is complete..."
+    print "Surrogate building of the objective is complete..."
 
     # Call the surrogate for the constraints
-    # Goes here
+    if M>0:
+        for mm in xrange(M):
+            surrogate = KrigingSurrogate()
+            surrogate.train(ModelInfo_g[mm].X_org, ModelInfo_g[mm].y)
+            ModelInfo_g[mm].X = surrogate.X
+            ModelInfo_g[mm].thetas = surrogate.thetas
+            ModelInfo_g[mm].mu = np.mean(surrogate.Y) #This value should always be 0.0
+            ModelInfo_g[mm].SigmaSqr = surrogate.sigma2/np.square(surrogate.Y_std) #This value should always be 1.0
+            ModelInfo_g[mm].c_r = surrogate.alpha
+            ModelInfo_g[mm].R_inv = surrogate.Vh.T.dot(np.einsum('i,ij->ij', surrogate.S_inv, surrogate.U.T))
+            ModelInfo_g[mm].Y_mean = surrogate.Y_mean
+            ModelInfo_g[mm].Y_std = surrogate.Y_std
+            ModelInfo_g[mm].X_std = surrogate.X_std.reshape(num_xI,1)
+            ModelInfo_g[mm].X_mean = surrogate.X_mean.reshape(num_xI,1)
+        print "Surrogate building of the constraints are complete..."
 
     if len(FEA_obj) >= 1:
         y_opt = np.min(FEA_obj)
@@ -125,6 +147,21 @@ while ter_crit == 0:
         x_opt = FEA_xopt[min_ind]
 
     # Save all the date here
+    # print "foobar-Print data for Matlab"
+    # print xI_lb, xI_ub
+    # print M
+    # print surrogate.Y
+    # print ModelInfo_g[0].X
+    # print ModelInfo_g[0].thetas
+    # print ModelInfo_g[0].mu
+    # print ModelInfo_g[0].SigmaSqr
+    # print ModelInfo_g[0].c_r
+    # print ModelInfo_g[0].R_inv
+    # print ModelInfo_g[0].Y_mean
+    # print ModelInfo_g[0].Y_std
+    # print ModelInfo_g[0].X_std
+    # print ModelInfo_g[0].X_mean
+    # exit()
     ############################################################################
     # Step 4: Maximize the expected improvement function to obtain an integer infill points
     # Choose the solver: 1. MINLP BB, 2. GA, 3. Both MINLP BB & GA
