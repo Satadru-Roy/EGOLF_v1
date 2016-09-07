@@ -98,14 +98,14 @@ def MINLP_BB(xI_lb, xI_ub, ModelInfo_obj, ModelInfo_g):
         # Step 3: Partition the current rectangle as per the new branching scheme
         child_info = np.zeros([2,3])
         dis_flag = [' ',' ']
+        l_iter = (xU_iter - xL_iter).argmax()
+        if xloc_iter[l_iter]<xU_iter[l_iter]:
+            delta = 0.5 #0<delta<1
+        else:
+            delta = -0.5 #-1<delta<0
         for ii in xrange(2):
             lb = cp.deepcopy(xL_iter)
             ub = cp.deepcopy(xU_iter)
-            l_iter = (xU_iter - xL_iter).argmax()
-            if xloc_iter[l_iter]<ub[l_iter]:
-                delta = 0.5 #0<delta<1
-            else:
-                delta = -0.5 #-1<delta<0
             if ii == 0:
                 ub[l_iter] = np.floor(xloc_iter[l_iter]+delta)
             elif ii == 1:
@@ -184,22 +184,22 @@ def MINLP_BB(xI_lb, xI_ub, ModelInfo_obj, ModelInfo_g):
                 child_info[ii] = np.array([par_node, np.inf, floc_iter])
                 dis_flag[ii] = 'x' #Flag for No child created
 
-        #Update the active set
-        can_pt+=1
-        canX = np.reshape(np.append(canX,xloc_iter),(can_pt,num_des))
-        canF = np.reshape(np.append(canF,floc_iter),(can_pt,1))
-        if floc_iter < UBD: # Better integer solution found
-            UBD = 1.0*floc_iter
-            fopt = 1.0*UBD
-            xopt = cp.deepcopy(xloc_iter).reshape(1,num_des)
-            if len(Aset) >= 1:
-                del_flag = []
-                for aaa in xrange(len(Aset)):
-                    if Aset[aaa][3] >= UBD:
-                        del_flag.extend([aaa])
-                Aset = [ii for jj, ii in enumerate(Aset) if jj not in del_flag]
-                # print del_flag
-            UBD_iter = np.append(UBD_iter,UBD)
+            #Update the active set
+            can_pt+=1
+            canX = np.reshape(np.append(canX,xloc_iter),(can_pt,num_des))
+            canF = np.reshape(np.append(canF,floc_iter),(can_pt,1))
+            if floc_iter < UBD: # Better integer solution found
+                UBD = 1.0*floc_iter
+                fopt = 1.0*UBD
+                xopt = cp.deepcopy(xloc_iter).reshape(1,num_des)
+                if len(Aset) >= 1:
+                    del_flag = []
+                    for aaa in xrange(len(Aset)):
+                        if Aset[aaa][3] >= UBD:
+                            del_flag.extend([aaa])
+                    Aset = [ii for jj, ii in enumerate(Aset) if jj not in del_flag]
+                    # print del_flag
+                UBD_iter = np.append(UBD_iter,UBD)
 
         # print "foobar-loop end check"
         # print xloc_iter, floc_iter
