@@ -55,8 +55,8 @@ def MINLP_BB(xI_lb, xI_ub, ModelInfo_obj, ModelInfo_g):
         print "Heuristic search in on....."
     else:
         #Randomly generate an integer point
-        # xopt = np.round(xI_lb + uniform(0,1)*(xI_ub - xI_lb))
-        xopt = np.array([[9]])
+        xopt = np.round(xI_lb + uniform(0,1)*(xI_ub - xI_lb)).reshape((1,num_des))
+        # xopt = np.array([[9]])
         fopt = combined_obj(xopt,ModelInfo_obj,ModelInfo_g,[],0)
         fC+=1.0
         UBD = 1.0*fopt
@@ -74,12 +74,13 @@ def MINLP_BB(xI_lb, xI_ub, ModelInfo_obj, ModelInfo_g):
         app_step2 = 1 #1-Uses gradient based approach
         loc_search = 0 #0-No local search, 1-local search
         if app_step2 == 1:
-            xloc_iter = np.round(0.5*(xU_iter+xL_iter))
+            xloc_iter = np.round(xL_iter + 0.49*(xU_iter - xL_iter)) #Put this to 0.49 for rounding direction towards left-bottom
             floc_iter = combined_obj(xloc_iter,ModelInfo_obj,ModelInfo_g,con_fac,con_flag)
-            efloc_iter = 1.0
             fC+=1.0
+            efloc_iter = 1.0
             if loc_search == 1: #Perform the local search
                 if np.abs(floc_iter) > 1.0e-6:
+                    xC_iter = xloc_iter
                     bnds = [(xL_iter[ii], xU_iter[ii]) for ii in xrange(num_des)]
                     optResult = minimize(combined_obj,xC_iter,\
                     args=(ModelInfo_obj,ModelInfo_g,con_fac,con_flag), method='SLSQP',\
@@ -111,7 +112,7 @@ def MINLP_BB(xI_lb, xI_ub, ModelInfo_obj, ModelInfo_g):
                 lb[l_iter] = np.ceil(xloc_iter[l_iter]+delta)
 
             # print lb, ub
-            if np.linalg.norm(xL_iter-xU_iter) > 1e-6: #Not a point
+            if np.linalg.norm(ub-lb) > 1e-6: #Not a point
                 # Step 4: Obtain an LBD of f in the newly created node
                 S4_fail = 0
                 x_comL, x_comU, Ain_hat, bin_hat = gen_coeff_bound(lb,ub,ModelInfo_obj)
@@ -176,28 +177,29 @@ def MINLP_BB(xI_lb, xI_ub, ModelInfo_obj, ModelInfo_g):
                     child_info[ii] = np.array([par_node, LBD_NegConEI, floc_iter])
                     dis_flag[ii] = 'X' #Flag for child created but not added to active set (fathomed)
             else:
-                xloc_iter = lb
-                floc_iter = combined_obj(xloc_iter,ModelInfo_obj,ModelInfo_g,con_fac,con_flag)
-                fC+=1.0
-                child_info[ii] = np.array([par_node, LBD_NegConEI, floc_iter])
+                if ii == 1:
+                    xloc_iter = ub
+                    floc_iter = combined_obj(xloc_iter,ModelInfo_obj,ModelInfo_g,con_fac,con_flag)
+                    fC+=1.0
+                child_info[ii] = np.array([par_node, np.inf, floc_iter])
                 dis_flag[ii] = 'x' #Flag for No child created
 
-            #Update the active set
-            can_pt+=1
-            canX = np.reshape(np.append(canX,xloc_iter),(can_pt,num_des))
-            canF = np.reshape(np.append(canF,floc_iter),(can_pt,1))
-            if floc_iter < UBD: # Better integer solution found
-                UBD = 1.0*floc_iter
-                fopt = 1.0*UBD
-                xopt = cp.deepcopy(xloc_iter).reshape(1,num_des)
-                if len(Aset) >= 1:
-                    del_flag = []
-                    for aaa in xrange(len(Aset)):
-                        if Aset[aaa][3] >= UBD:
-                            del_flag.extend([aaa])
-                    Aset = [ii for jj, ii in enumerate(Aset) if jj not in del_flag]
-                    # print del_flag
-                UBD_iter = np.append(UBD_iter,UBD)
+        #Update the active set
+        can_pt+=1
+        canX = np.reshape(np.append(canX,xloc_iter),(can_pt,num_des))
+        canF = np.reshape(np.append(canF,floc_iter),(can_pt,1))
+        if floc_iter < UBD: # Better integer solution found
+            UBD = 1.0*floc_iter
+            fopt = 1.0*UBD
+            xopt = cp.deepcopy(xloc_iter).reshape(1,num_des)
+            if len(Aset) >= 1:
+                del_flag = []
+                for aaa in xrange(len(Aset)):
+                    if Aset[aaa][3] >= UBD:
+                        del_flag.extend([aaa])
+                Aset = [ii for jj, ii in enumerate(Aset) if jj not in del_flag]
+                # print del_flag
+            UBD_iter = np.append(UBD_iter,UBD)
 
         # print "foobar-loop end check"
         # print xloc_iter, floc_iter
