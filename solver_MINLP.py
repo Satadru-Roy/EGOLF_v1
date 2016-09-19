@@ -56,7 +56,7 @@ def MINLP_BB(xI_lb, xI_ub, ModelInfo_obj, ModelInfo_g):
     else:
         #Randomly generate an integer point
         xopt = np.round(xI_lb + uniform(0,1)*(xI_ub - xI_lb)).reshape((1,num_des))
-        # xopt = np.array([[9]])
+        # xopt = np.array([[2.0,2.0,2.0]])
         fopt = combined_obj(xopt,ModelInfo_obj,ModelInfo_g,[],0)
         fC+=1.0
         UBD = 1.0*fopt
@@ -67,6 +67,9 @@ def MINLP_BB(xI_lb, xI_ub, ModelInfo_obj, ModelInfo_g):
     "Node1","LBD1","Node2","LBD2","Flocal")
     print "====================================================================================="
 
+    # print "check before  while loop"
+    # print xopt, fopt, UBD, fC
+    # exit()
     while term == 0:
         con_fac=[] #concave_factor(xL_iter,xU_iter)
         con_flag = 0
@@ -78,6 +81,10 @@ def MINLP_BB(xI_lb, xI_ub, ModelInfo_obj, ModelInfo_g):
             floc_iter = combined_obj(xloc_iter,ModelInfo_obj,ModelInfo_g,con_fac,con_flag)
             fC+=1.0
             efloc_iter = 1.0
+            # print "Check with local sampling"
+            # print xloc_iter
+            # print floc_iter
+            # exit()
             if loc_search == 1: #Perform the local search
                 if np.abs(floc_iter) > 1.0e-6:
                     xC_iter = xloc_iter
@@ -116,10 +123,12 @@ def MINLP_BB(xI_lb, xI_ub, ModelInfo_obj, ModelInfo_g):
                 # Step 4: Obtain an LBD of f in the newly created node
                 S4_fail = 0
                 x_comL, x_comU, Ain_hat, bin_hat = gen_coeff_bound(lb,ub,ModelInfo_obj)
-                sU, eflag_sU = maximize_S(x_comL, x_comU, Ain_hat, bin_hat, ModelInfo_obj)
                 # print "foobar-step4 LBD"
-                # print "foobar-Smax"
+                # print lb, ub
                 # print x_comL, x_comU, Ain_hat, bin_hat
+                # exit()
+                sU, eflag_sU = maximize_S(x_comL, x_comU, Ain_hat, bin_hat, ModelInfo_obj)
+                # print "foobar-Smax"
                 # print sU, eflag_sU
                 # exit()
                 if eflag_sU >= 1:
@@ -168,7 +177,7 @@ def MINLP_BB(xI_lb, xI_ub, ModelInfo_obj, ModelInfo_g):
                     LBD_NegConEI = (NegEI/(1.0+np.sum(EV)))
 
                 # Step5: Store any new node inside the active set that has LBD lower than the UBD
-                if (LBD_NegConEI) < UBD:
+                if (LBD_NegConEI) < UBD-1.0e-6:
                     node_num += 1
                     newNode = [node_num, lb, ub, LBD_NegConEI, floc_iter]
                     Aset.extend([newNode])
@@ -254,10 +263,11 @@ def combined_obj(xI,*param):
     lb = ModelInfo_obj.lb
     ub = ModelInfo_obj.ub
 
-    # xval = (xI - lb_org)/(ub_org - lb_org)     # Normalize to a unit hypercube
+    if xI.shape[1] > 1:
+        xI = xI.T
+    xval = (xI - lb_org)/(ub_org - lb_org)     # Normalize to a unit hypercube
 
-    xval = (xI - ModelInfo_obj.X_mean.T)/ModelInfo_obj.X_std.T # Normalized as per the convention in kriging of openmdao
-
+    # xval = (xI - ModelInfo_obj.X_mean.T)/ModelInfo_obj.X_std.T # Normalized as per the convention in kriging of openmdao
     NegEI = calc_conEI_norm(xval,ModelInfo_obj)
 
     M=len(ModelInfo_g)
@@ -279,9 +289,9 @@ def combined_obj(xI,*param):
 def calc_conEI_norm(xval,ModelInfo_obj,*param):
     '''This modules evaluates the expected improvement in the normalized
     design sapce'''
-    y_min = (ModelInfo_obj.y_best - ModelInfo_obj.Y_mean)/ModelInfo_obj.Y_std
+    # y_min = (ModelInfo_obj.y_best - ModelInfo_obj.Y_mean)/ModelInfo_obj.Y_std
 
-    # y_min = ModelInfo_obj.y_best
+    y_min = ModelInfo_obj.y_best
     X = ModelInfo_obj.X
     if len(param) == 0:
         c_r = ModelInfo_obj.c_r
@@ -294,7 +304,7 @@ def calc_conEI_norm(xval,ModelInfo_obj,*param):
         one = np.ones([n,1])
         r = np.ones([n,1])
         for ii in xrange(n):
-            r[ii] = np.exp(-np.sum(thetas*(xval - X[ii])**p))
+            r[ii] = np.exp(-np.sum(thetas.T*(xval.T - X[ii])**p))
 
         y_hat = mu + np.dot(r.T,c_r)
         SSqr = SigmaSqr*(1.0 - r.T.dot(np.dot(R_inv,r)) + \
@@ -327,8 +337,9 @@ def calc_conEV_norm(xval,ModelInfo_g,*param):
         n = np.shape(X)[0]
         one = np.ones([n,1])
         r = np.ones([n,1])
+
         for ii in xrange(n):
-            r[ii] = np.exp(-np.sum(thetas*(xval - X[ii])**p))
+            r[ii] = np.exp(-np.sum(thetas.T*(xval.T - X[ii])**p))
 
         g_hat = mu + np.dot(r.T,c_r)
         gSSqr = SigmaSqr*(1.0 - r.T.dot(np.dot(R_inv,r)) + \
@@ -354,12 +365,12 @@ def gen_coeff_bound(xI_lb, xI_ub, ModelInfo):
     to normalized design space'''
 
     #Normalized to 0-1 hypercube
-    # xL_hat = (xI_lb - ModelInfo.lb_org)/(ModelInfo.ub_org - ModelInfo.lb_org)
-    # xU_hat = (xI_ub - ModelInfo.lb_org)/(ModelInfo.ub_org - ModelInfo.lb_org)
+    xL_hat = (xI_lb - ModelInfo.lb_org)/(ModelInfo.ub_org - ModelInfo.lb_org)
+    xU_hat = (xI_ub - ModelInfo.lb_org)/(ModelInfo.ub_org - ModelInfo.lb_org)
 
     #Normalized as per openmdao krigging model
-    xL_hat = (xI_lb - ModelInfo.X_mean)/ModelInfo.X_std
-    xU_hat = (xI_ub - ModelInfo.X_mean)/ModelInfo.X_std
+    # xL_hat = (xI_lb - ModelInfo.X_mean)/ModelInfo.X_std
+    # xU_hat = (xI_ub - ModelInfo.X_mean)/ModelInfo.X_std
 
     rL, rU = interval_analysis(xL_hat, xU_hat, ModelInfo)
 
@@ -546,7 +557,7 @@ def maximize_S(x_comL,x_comU,Ain_hat,bin_hat,ModelInfo):
     cons = [{'type' : 'ineq','fun' : lambda x : -np.dot(Ain_hat[ii,:],x) + bin_hat[ii,0],'jac': lambda x:-Ain_hat[ii,:]} for ii in xrange(2*n)]
     optResult = minimize(calc_SSqr_convex,x0,\
     args=(ModelInfo,x_comL,x_comU,xhat_comL,xhat_comU),method='SLSQP',\
-    constraints=cons,bounds=bnds,options={'ftol':1e-12,'maxiter':100})
+    constraints=cons,bounds=bnds,options={'ftol':1e-4,'maxiter':100})
     Neg_sU = optResult.fun
     if not optResult.success:
         eflag_sU=0.0
@@ -598,13 +609,16 @@ def minimize_y(x_comL, x_comU, Ain_hat, bin_hat, ModelInfo):
     xhat_comL[k:] = np.zeros([n,1])
     xhat_comU[k:] = np.ones([n,1])
 
+    # print "check Min y"
+    # print xhat_comL, xhat_comU, Ain_hat, bin_hat
+    # exit()
     if app == 1:
         x0 = 0.5*(xhat_comL+xhat_comU)
         bnds = [(xhat_comL[ii], xhat_comU[ii]) for ii in xrange(len(xhat_comL))]
         cons = [{'type' : 'ineq','fun' : lambda x : -np.dot(Ain_hat[ii,:],x) + bin_hat[ii,0],'jac': lambda x:-Ain_hat[ii,:]} for ii in xrange(2*n)]
         optResult = minimize(calc_y_hat_convex,x0,\
         args=(x_comL,x_comU,ModelInfo),method='SLSQP',\
-        constraints=cons,bounds=bnds,options={'ftol':1e-12,'maxiter':100})
+        constraints=cons,bounds=bnds,options={'ftol':1e-4,'maxiter':10000})
         yL = optResult.fun
         if not optResult.success:
             eflag_yL=0.0
@@ -612,7 +626,8 @@ def minimize_y(x_comL, x_comU, Ain_hat, bin_hat, ModelInfo):
             eflag_yL=1.0
             for ii in xrange(2*n):
                 # print np.dot(Ain_hat[ii,:],optResult.x) - bin_hat[ii,0]
-                if np.dot(Ain_hat[ii,:],optResult.x) >  (bin_hat[ii,0] + 1.0e-6):
+                # print np.dot(Ain_hat[ii,:],optResult.x.T) - bin_hat[ii,0]
+                if np.dot(Ain_hat[ii,:],optResult.x.T) >  (bin_hat[ii,0] + 1.0e-6):
                     eflag_yL=0.0
                     break
     # print "foobar-Min y check"
@@ -639,6 +654,8 @@ def calc_y_hat_convex(x_com,*param):
     # print "foobar-calc_y check"
     # print x_com, rhat
     # print mu, r, c_r
+    # print r
+    # print x_com
     # print y_hat
     # exit()
     return y_hat[0,0]
@@ -662,27 +679,133 @@ if __name__ == "__main__":
     # Test MINLP_BB with dummy inputs
     xI_lb = np.array([[1.0],[1.0],[1.0]])
     xI_ub = np.array([[4.0],[4.0],[4.0]])
+    M = 3
     n=5
     num_xI = len(xI_lb)
+    #Objective data
     ModelInfo_obj = ModelInfo(xI_lb, xI_ub, num_xI)
-    ModelInfo_obj.X = np.array([[1.0, 0.3333, 0.0],[0.3333,0.66667,1.0],[0.6667,0.0,0.6667],[0.6667,1.0,0.6667],[0.0,0.6667,0.3333]])
-    ModelInfo_obj.X_org = np.array([[4.0,2.0,1.0],[2.0,3.0,4.0],[3.0,1.0,3.0],[3.0,4.0,3.0],[1.0,3.0,4.0]])
-    ModelInfo_obj.xC = np.array([[10.5354,3.9769,-0.5354],[5.123,2.0374,1e-10],[5.2353,10,0.8641],[2.5176,9.9465,1e-10],[10,7.6254,5.0813]])
-    ModelInfo_obj.y = np.array([[17.6358],[5.83369],[11.3883],[13.8669],[15.6657]])
-    ModelInfo_obj.eflag = np.array([[-2],[1],[5],[1],[5]])
-    ModelInfo_obj.y_best = 5.8369
-    ModelInfo_obj.thetas = np.array([[-3.0],[-0.7837],[0.8241]]) #10.**np.array([[0.465979016183845]])
+    ModelInfo_obj.lb_org = xI_lb.copy()
+    ModelInfo_obj.ub_org = xI_ub.copy()
+    ModelInfo_obj.X = np.array([[0.0,0.66666666666667,0.66666666666667],\
+                                [0.66666666666667,1.0,1.0],\
+                                [0.0,0.66666666666667,0.0],\
+                                [0.33333333333333,0.0,0.33333333333333],\
+                                [1.0,0.33333333333333,0.66666666666667]])
+    ModelInfo_obj.X_org = np.array([[1.0,3.0,3.0],[3.0,4.0,4.0],[1.0,3.0,1.0],[2.0,1.0,2.0],[4.0,2.0,3.0]])
+    ModelInfo_obj.xC = np.array([[10.000000000000000,7.611934707614728,2.884713617365940],\
+       [6.139509615250542,9.850382457843574,0.000000000100000],\
+       [10.000000000000000,7.639024631926064,8.526550379139559],\
+       [9.251987139688117,10.000000000000000,1.527127041337365],\
+       [10.227954337559884,3.968105909184939,-0.227954337459885]])
+    ModelInfo_obj.y = np.array([[15.626344347459352],[18.603914134812975],\
+    [15.705089842796930],[11.471743511194173],[17.112772214006487]])
+    ModelInfo_obj.eflag = np.array([[5.0],[1.0],[5.0],[5.0],[-2.0]])
+    ModelInfo_obj.y_best = np.min(ModelInfo_obj.y)
+    ModelInfo_obj.thetas = np.array([[10.0**1.022038094255710],[10.0**0.569609718087874],[10.0**-2.99999023616931]]) #10.**np.array([[0.465979016183845]])
     ModelInfo_obj.p = 2
-    ModelInfo_obj.R_inv = np.array([[1.360479432971258,  -0.143414668885071,  0.108361045491168,   0.289847077490181, -0.812176679074090],\
-    [-0.143414668885071,   1.377512294282917,  -0.285503196753005,  -0.579539489572422,  0.393482009606974],\
-    [ 0.108361045491168,  -0.285503196753005,   3.664782422779223,  -2.821981603552740, -0.338668243357097],\
-    [ 0.289847077490181,  -0.579539489572422,  -2.821981603552740,   3.988757815245509, -0.721814851181005],\
-    [-0.812176679074090,   0.393482009606974,  -0.338668243357097,  -0.721814851181005,  1.846980282319067]])
-    ModelInfo_obj.SigmaSqr = 21.64238
-    ModelInfo_obj.mu = 12.5235
+    ModelInfo_obj.R_inv = np.array([[1125.44012840546,-0.00907704868570349,-1124.93817728487,-0.0298893649269364,0.000708142016463804],\
+    [-0.00907704868570349,1.00365956919566,0.00330061256788934,-0.00690020760577544,-0.0598505705497161],\
+    [ -1124.93817728487,0.00330061256788934,1125.44005717367,-0.0299745724787454,-1.21069549498704e-05],\
+    [ -0.0298893649269364,-0.00690020760577544,-0.0299745724787454,1.00366035784801,-0.00577790767390208],\
+    [0.000708142016463804,-0.0598505705497161,-1.21069549498704e-05,-0.00577790767390208,1.00360720056043]])
+    ModelInfo_obj.SigmaSqr = 7.024300865720791
+    ModelInfo_obj.mu = 15.716396564175804
     ModelInfo_obj.c_r = ModelInfo_obj.R_inv.dot(ModelInfo_obj.y-(np.ones([n,1])*ModelInfo_obj.mu))
 
+    #constraints
+    ModelInfo_g=[[]]*M
+    #Constraint 1 data
+    ModelInfo_g[0] = ModelInfo(xI_lb, xI_ub, num_xI)
+    ModelInfo_g[0].lb_org = xI_lb.copy()
+    ModelInfo_g[0].ub_org = xI_ub.copy()
+    ModelInfo_g[0].X = np.array([[0.0,0.66666666666667,0.66666666666667],\
+                                [0.66666666666667,1.0,1.0],\
+                                [0.0,0.66666666666667,0.0],\
+                                [0.33333333333333,0.0,0.33333333333333],\
+                                [1.0,0.33333333333333,0.66666666666667]])
+    ModelInfo_g[0].X_org = np.array([[1.0,3.0,3.0],[3.0,4.0,4.0],[1.0,3.0,1.0],[2.0,1.0,2.0],[4.0,2.0,3.0]])
+    # ModelInfo_g[0].xC = np.array([[10.000000000000000   7.611934707614728   2.884713617365940],\
+    #    [6.139509615250542   9.850382457843574   0.000000000100000],\
+    #    [10.000000000000000   7.639024631926064   8.526550379139559],\
+    #    [9.251987139688117  10.000000000000000   1.527127041337365],\
+    #    [10.227954337559884   3.968105909184939  -0.227954337459885]])
+    ModelInfo_g[0].y = np.array([[5.78500136683147e-10],[-0.590082052917028],\
+    [1.66796954026438e-09],[-0.430705218486039],[0.105060456476318]])
 
+    # ModelInfo_g[0].eflag = np.array([[5.0],[1.0],[5.0],[5.0],[-2.0]])
+    # ModelInfo_g[0].y_best = np.min(ModelInfo_g.y)
+    ModelInfo_g[0].thetas = np.array([[10.0**1.914806493588213],[10.0**1.834555468897605],[10.0**-2.999998679277249]]) #10.**np.array([[0.465979016183845]])
+    ModelInfo_g[0].p = 2
+    ModelInfo_g[0].R_inv = np.array([[1125.49665286775,-1.03579143745391e-19,-1124.99654175630,-3.51331249730258e-18,9.69285761486067e-37],\
+    [-1.03579143745391e-19,1.00000000000000,3.45263789749402e-20,-2.29347906849811e-34,-7.02506386458047e-18],\
+    [-1124.99654175630,3.45263789749402e-20,1125.49665286775,-3.51331249730304e-18,1.07824296558663e-40],\
+    [-3.51331249730258e-18,-2.29347906849811e-34,-3.51331249730304e-18,1.00000000000000,-6.90681064649094e-20],\
+    [9.69285761486067e-37,-7.02506386458047e-18,1.07824296558663e-40,-6.90681064649094e-20,1.00000000000000]])
+    ModelInfo_g[0].SigmaSqr = 0.067022852107014
+    ModelInfo_g[0].mu = -0.228918985690923
+    ModelInfo_g[0].c_r = ModelInfo_g[0].R_inv.dot(ModelInfo_g[0].y-(np.ones([n,1])*ModelInfo_g[0].mu))
+
+    #Constraint 2 data
+    ModelInfo_g[1] = ModelInfo(xI_lb, xI_ub, num_xI)
+    ModelInfo_g[1].lb_org = xI_lb.copy()
+    ModelInfo_g[1].ub_org = xI_ub.copy()
+    ModelInfo_g[1].X = np.array([[0.0,0.66666666666667,0.66666666666667],\
+                                [0.66666666666667,1.0,1.0],\
+                                [0.0,0.66666666666667,0.0],\
+                                [0.33333333333333,0.0,0.33333333333333],\
+                                [1.0,0.33333333333333,0.66666666666667]])
+    ModelInfo_g[1].X_org = np.array([[1.0,3.0,3.0],[3.0,4.0,4.0],[1.0,3.0,1.0],[2.0,1.0,2.0],[4.0,2.0,3.0]])
+    # ModelInfo_g[1].xC = np.array([[10.000000000000000   7.611934707614728   2.884713617365940],\
+    #    [6.139509615250542   9.850382457843574   0.000000000100000],\
+    #    [10.000000000000000   7.639024631926064   8.526550379139559],\
+    #    [9.251987139688117  10.000000000000000   1.527127041337365],\
+    #    [10.227954337559884   3.968105909184939  -0.227954337459885]])
+    ModelInfo_g[1].y = np.array([[-0.624313944607018],[-1.23824395181771e-09],\
+    [-0.625643064976861],[9.17266262945304e-12],[0.176556341141486]])
+
+    # ModelInfo_g[1].eflag = np.array([[5.0],[1.0],[5.0],[5.0],[-2.0]])
+    # ModelInfo_g[1].y_best = np.min(ModelInfo_g.y)
+    ModelInfo_g[1].thetas = np.array([[10.0**1.75267291844906],[10.0**1.94803457741727],[10.0**-2.99999709235029]]) #10.**np.array([[0.465979016183845]])
+    ModelInfo_g[1].p = 2
+    ModelInfo_g[1].R_inv = np.array([[1125.49254209951,-9.40437651295121e-16,-1124.99243098766,-6.97368882673638e-21,-1.39876957796595e-29],\
+    [-9.40437651295121e-16,1.00000000000000,3.13479196459711e-16,1.74869039997435e-35,-1.39442789041313e-20],\
+    [-1124.99243098766,3.13479196459711e-16,1125.49254209951,-6.97368882673579e-21,2.03469344569694e-39],\
+    [-6.97368882673638e-21,1.74869039997435e-35,-6.97368882673579e-21,1.00000000000000,-6.27097748898778e-16],\
+    [-1.39876957796595e-29,-1.39442789041313e-20,2.03469344569694e-39,-6.27097748898778e-16,1.00000000000000]])
+    ModelInfo_g[1].SigmaSqr = 0.074709184637465
+    ModelInfo_g[1].mu = -0.112134032769722
+    ModelInfo_g[1].c_r = ModelInfo_g[1].R_inv.dot(ModelInfo_g[1].y-(np.ones([n,1])*ModelInfo_g[1].mu))
+
+    #Constraint 3 data
+    ModelInfo_g[2] = ModelInfo(xI_lb, xI_ub, num_xI)
+    ModelInfo_g[2].lb_org = xI_lb.copy()
+    ModelInfo_g[2].ub_org = xI_ub.copy()
+    ModelInfo_g[2].X = np.array([[0.0,0.66666666666667,0.66666666666667],\
+                                [0.66666666666667,1.0,1.0],\
+                                [0.0,0.66666666666667,0.0],\
+                                [0.33333333333333,0.0,0.33333333333333],\
+                                [1.0,0.33333333333333,0.66666666666667]])
+    ModelInfo_g[2].X_org = np.array([[1.0,3.0,3.0],[3.0,4.0,4.0],[1.0,3.0,1.0],[2.0,1.0,2.0],[4.0,2.0,3.0]])
+    # ModelInfo_g[2].xC = np.array([[10.000000000000000   7.611934707614728   2.884713617365940],\
+    #    [6.139509615250542   9.850382457843574   0.000000000100000],\
+    #    [10.000000000000000   7.639024631926064   8.526550379139559],\
+    #    [9.251987139688117  10.000000000000000   1.527127041337365],\
+    #    [10.227954337559884   3.968105909184939  -0.227954337459885]])
+    ModelInfo_g[2].y = np.array([[-0.799251531258173],[9.09372777080364e-09],\
+    [-0.649335674057793],[-0.905410643421811],[-0.204916110619887]])
+
+    # ModelInfo_g[2].eflag = np.array([[5.0],[1.0],[5.0],[5.0],[-2.0]])
+    # ModelInfo_g[2].y_best = np.min(ModelInfo_g.y)
+    ModelInfo_g[2].thetas = np.array([[10.0**0.846781351101145],[10.0**0.111475071389736],[10.0**-0.648543251374813]]) #10.**np.array([[0.465979016183845]])
+    ModelInfo_g[2].p = 2
+    ModelInfo_g[2].R_inv = np.array([[5.54536361397759,-0.0426244147112794,-4.98268790802283,-0.137228297191174,0.0150273667062081],\
+    [-0.0426244147112794,1.08047590606653,0.0337130928183813,-0.110770492761965,-0.267625325787606],\
+    [-4.98268790802283,0.0337130928183813,5.54474147692432,-0.145084931027714,-0.00311100078459050],\
+    [-0.137228297191174,-0.110770492761965,-0.145084931027714,1.08406724836207,-0.0122473123768546],\
+    [0.0150273667062081,-0.267625325787606,-0.00311100078459050,-0.0122473123768546,1.06775736060134]])
+    ModelInfo_g[2].SigmaSqr = 0.126924622798639
+    ModelInfo_g[2].mu = -0.459719857128503
+    ModelInfo_g[2].c_r = ModelInfo_g[2].R_inv.dot(ModelInfo_g[2].y-(np.ones([n,1])*ModelInfo_g[2].mu))
 
     # ModelInfo_obj.X_mean = 0.;ModelInfo_obj.X_std=1
     # ModelInfo_obj.Y_mean = 0.;ModelInfo_obj.Y_std=1
@@ -695,6 +818,6 @@ if __name__ == "__main__":
     # x_com = np.array([[0.233292711176682],[0.349656479929390],[0.349258214033471],[ 0.474123962414235]])
     # _ = calc_SSqr_convex(x_com,ModelInfo_obj,x_comL,x_comU,xhat_comL,xhat_comU)
     _ = MINLP_BB(xI_lb, xI_ub, ModelInfo_obj, ModelInfo_g)
-    print xopt
-    print fopt
-    print eflag
+    # print xopt
+    # print fopt
+    # print eflag
