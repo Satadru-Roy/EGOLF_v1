@@ -17,8 +17,8 @@ from solver_MINLP import MINLP_BB
 from random import uniform
 import time
 
-num_des = 2 #Total number of design variables
-prob = 1 # Problem type: 1. Branin 2. Griewank 3. Rosenbrock 4. 3 Bar Truss problem
+num_des = 6 #Total number of design variables
+prob = 4 # Problem type: 1. Branin 2. Griewank 3. Rosenbrock 4. 3 Bar Truss problem
 ################################################################################
 #Step 0: Initialize
 iter = 1
@@ -89,7 +89,7 @@ while ter_crit == 0:
 
         # Surrogate data for the objective function
         # if num_pt==5:
-        # ModelInfo_obj.X_hat = np.append(ModelInfo_obj.X_hat,x0I_hat[nonNAN]).reshape(num_pt,num_xI)
+        ModelInfo_obj.X_hat = np.append(ModelInfo_obj.X_hat,x0I_hat[nonNAN]).reshape(num_pt,num_xI)
         ModelInfo_obj.X_org = np.append(ModelInfo_obj.X_org,x0I[nonNAN]).reshape(num_pt,num_xI)
         ModelInfo_obj.xC = np.append(ModelInfo_obj.xC,xC_opt[nonNAN]).reshape(num_pt,num_xC)
         ModelInfo_obj.y = np.append(ModelInfo_obj.y,obj[nonNAN]).reshape(num_pt,1)
@@ -98,7 +98,7 @@ while ter_crit == 0:
         if M>0:
             for mm in xrange(M):
                 # Put a check here to ensure cons are never NaN or imaginary
-                # ModelInfo_g[mm].X_hat = np.append(ModelInfo_g[mm].X_hat,x0I_hat[nonNAN]).reshape(num_pt,num_xI)
+                ModelInfo_g[mm].X_hat = np.append(ModelInfo_g[mm].X_hat,x0I_hat[nonNAN]).reshape(num_pt,num_xI)
                 ModelInfo_g[mm].X_org = np.append(ModelInfo_g[mm].X_org,x0I[nonNAN]).reshape(num_pt,num_xI)
                 ModelInfo_g[mm].y = np.append(ModelInfo_g[mm].y,g[nonNAN,mm]).reshape(num_pt,1)
 
@@ -109,35 +109,38 @@ while ter_crit == 0:
             FEA_xopt = np.append(FEA_xopt,np.concatenate((x0I[nonNAN,:],xC_opt[nonNAN,:]))).reshape(fea_pt,num_xI+num_xC)
     # Call the surrogate building function
     surrogate = KrigingSurrogate() #Use ModelInfo_obj in the future release
-    surrogate.train(ModelInfo_obj.X_org, ModelInfo_obj.y)
+    # surrogate.train(ModelInfo_obj.X_org, ModelInfo_obj.y)
+    surrogate.train(ModelInfo_obj.X_hat, ModelInfo_obj.y, False)
     ModelInfo_obj.X = surrogate.X
     # ModelInfo_obj.ynorm = surrogate.Y
     ModelInfo_obj.thetas = surrogate.thetas
-    ModelInfo_obj.mu = np.mean(surrogate.Y) #This value should always be 0.0
-    ModelInfo_obj.SigmaSqr = surrogate.sigma2/np.square(surrogate.Y_std) #This value should always be 1.0
-    ModelInfo_obj.c_r = surrogate.alpha
-    ModelInfo_obj.R_inv = surrogate.Vh.T.dot(np.einsum('i,ij->ij', surrogate.S_inv, surrogate.U.T))
-    ModelInfo_obj.Y_mean = surrogate.Y_mean
-    ModelInfo_obj.Y_std = surrogate.Y_std
-    ModelInfo_obj.X_std = surrogate.X_std.reshape(num_xI,1)
-    ModelInfo_obj.X_mean = surrogate.X_mean.reshape(num_xI,1)
+    ModelInfo_obj.mu = surrogate.mu #np.mean(surrogate.Y) #This value should always be 0.0
+    ModelInfo_obj.SigmaSqr = surrogate.SigmaSqr #surrogate.sigma2/np.square(surrogate.Y_std) #This value should always be 1.0
+    ModelInfo_obj.c_r = surrogate.c_r #surrogate.alpha
+    ModelInfo_obj.R_inv = surrogate.R_inv #surrogate.Vh.T.dot(np.einsum('i,ij->ij', surrogate.S_inv, surrogate.U.T))
+    surrogate.predict(ModelInfo_obj.X_hat[ii], False)
+    exit()
+    # ModelInfo_obj.Y_mean = surrogate.Y_mean
+    # ModelInfo_obj.Y_std = surrogate.Y_std
+    # ModelInfo_obj.X_std = surrogate.X_std.reshape(num_xI,1)
+    # ModelInfo_obj.X_mean = surrogate.X_mean.reshape(num_xI,1)
     print "Surrogate building of the objective is complete..."
 
     # Call the surrogate for the constraints
     if M>0:
         for mm in xrange(M):
             surrogate = KrigingSurrogate()
-            surrogate.train(ModelInfo_g[mm].X_org, ModelInfo_g[mm].y)
+            surrogate.train(ModelInfo_g[mm].X_org, ModelInfo_g[mm].y,False)
             ModelInfo_g[mm].X = surrogate.X
             ModelInfo_g[mm].thetas = surrogate.thetas
-            ModelInfo_g[mm].mu = np.mean(surrogate.Y) #This value should always be 0.0
-            ModelInfo_g[mm].SigmaSqr = surrogate.sigma2/np.square(surrogate.Y_std) #This value should always be 1.0
-            ModelInfo_g[mm].c_r = surrogate.alpha
-            ModelInfo_g[mm].R_inv = surrogate.Vh.T.dot(np.einsum('i,ij->ij', surrogate.S_inv, surrogate.U.T))
-            ModelInfo_g[mm].Y_mean = surrogate.Y_mean
-            ModelInfo_g[mm].Y_std = surrogate.Y_std
-            ModelInfo_g[mm].X_std = surrogate.X_std.reshape(num_xI,1)
-            ModelInfo_g[mm].X_mean = surrogate.X_mean.reshape(num_xI,1)
+            ModelInfo_g[mm].mu = surrogate.mu #np.mean(surrogate.Y) #This value should always be 0.0
+            ModelInfo_g[mm].SigmaSqr = surrogate.SigmaSqr #/np.square(surrogate.Y_std) #This value should always be 1.0
+            ModelInfo_g[mm].c_r = surrogate.c_r
+            ModelInfo_g[mm].R_inv = surrogate.R_inv #Vh.T.dot(np.einsum('i,ij->ij', surrogate.S_inv, surrogate.U.T))
+            # ModelInfo_g[mm].Y_mean = surrogate.Y_mean
+            # ModelInfo_g[mm].Y_std = surrogate.Y_std
+            # ModelInfo_g[mm].X_std = surrogate.X_std.reshape(num_xI,1)
+            # ModelInfo_g[mm].X_mean = surrogate.X_mean.reshape(num_xI,1)
         print "Surrogate building of the constraints are complete..."
 
     if len(FEA_obj) >= 1:
@@ -146,7 +149,7 @@ while ter_crit == 0:
         ModelInfo_obj.y_best = y_opt
         x_opt = FEA_xopt[min_ind]
 
-    # Save all the date here
+    # # Save all the date here
     # print "foobar-Print data for Matlab"
     # print xI_lb, xI_ub
     # print M
