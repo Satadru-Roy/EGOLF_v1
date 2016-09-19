@@ -60,7 +60,7 @@ ModelInfo.alpha = alpha;
 % eig_mat = eig(Hmat_val)
 
 x0 = 0.5*(xhat_comL + xhat_comU);
-options = optimset('MaxFunEvals',100000,'Display','none','algorithm','active-set');
+options = optimset('MaxFunEvals',100000,'Display','none');
 [x_com, Neg_sU,eflag_sU] = fmincon(@(x_com) calc_SSqr_convex2(x_com,...
     ModelInfo,x_comL,x_comU,xhat_comL,xhat_comU),x0, Ain_hat, bin_hat, [],[],xhat_comL,xhat_comU,[],options);
 sU = -Neg_sU; %Upper bound on sU

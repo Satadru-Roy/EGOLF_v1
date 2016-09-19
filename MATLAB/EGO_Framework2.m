@@ -2,7 +2,7 @@
 % The version 2 normalizes the design variables within [0,1]
 clear;close all;clc
 tst_EGOLF= tic;
-% addpath(genpath(pwd));
+addpath(genpath(pwd));
 warning('off','all'); 
 Run_no = 1;
 %% Test problems
@@ -165,7 +165,7 @@ while ter_crit == 0
 %         [ModelInfo_obj, ModelInfo_g] = manual_override(ModelInfo_obj,ModelInfo_g,iter);
 %     end
 %% Step 4: Maximize the expected improvement function
-    app_step4 = 3; % 1-MINLP BB., 2-GA,  3-Both
+    app_step4 = 1; % 1-MINLP BB., 2-GA,  3-Both
     fprintf('\n%s%d','Run number: ',Run_no)
     fprintf('\n%s%d\n','EGO-Iter: ',iter)
     %% Solve to maximize the expected improvement
