@@ -103,15 +103,15 @@ while term == 0
     %% Step 3: Partition current rectangle
     child_info = zeros(2,3);
     dis_flag = [' ';' '];
+    [~,l_iter] = max(xU_iter - xL_iter); %Branch at variable with the largest edge
+    if xloc_iter(l_iter)<xU_iter(l_iter)
+        delta = 0.5; % 0<delta<1 
+    else
+        delta = -0.5; % -1<delta<0
+    end
     for ii = 1:2
         lb = xL_iter;
         ub = xU_iter;
-        [~,l_iter] = max(xU_iter - xL_iter); %Branch at variable with the largest edge
-        if xloc_iter(l_iter)<ub(l_iter)
-            delta = 0.5; % 0<delta<1 
-        else
-            delta = -0.5; % -1<delta<0
-        end
         if ii == 1
             ub(l_iter) = floor(xloc_iter(l_iter)+delta); 
         elseif ii == 2
