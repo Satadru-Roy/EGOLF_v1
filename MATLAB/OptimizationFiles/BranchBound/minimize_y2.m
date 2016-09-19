@@ -18,7 +18,7 @@ if app==1 % This solves the LP that minimizes the y_hat
     alg = 1;
     if alg == 1 % Use a gradient-based approach to solve this
         x0 = 0.5*(xhat_comL+xhat_comU);
-        options = optimset('Display','none','algorithm','active-set');
+        options = optimset('Display','none');
         [x_com,yL,eflag_yL] = fmincon(@(x_com) calc_y_hat_convex2(x_com,x_comL,x_comU,ModelInfo),...
             x0,Ain_hat,bin_hat,[],[],xhat_comL,xhat_comU,[],options);
     elseif alg ==2 % Use LP solver to solve this
